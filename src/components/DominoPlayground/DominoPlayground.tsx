@@ -249,8 +249,13 @@ function Snake({
     </div>
   );
 }
+interface DominoBlockProps {
+  piece: DominoPiece;
+  as?: keyof JSX.IntrinsicElements;
+  className?: string;
+}
 
-function DominoBlock({ piece, as: Tag = "div", className = "", ...delegated }) {
+function DominoBlock({ piece, as: Tag = "div", className = "", ...delegated }: DominoBlockProps) {
   return (
     <Tag
       className={clsx(
