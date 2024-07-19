@@ -47,7 +47,7 @@ function GameInitMenu() {
   }
 
   function handleCheck(event: React.SyntheticEvent, piece: DominoPiece) {
-    if (event.target.checked) {
+    if ((event.target as HTMLInputElement).checked) {
       if (
         initialGameInfo.hands[(player + 1) % 2].some((pieceOfHand) =>
           comparePieces(piece, pieceOfHand)
@@ -264,7 +264,7 @@ function DominoBlock({ piece, as: Tag = "div", className = "", ...delegated }) {
   );
 }
 
-function Button({ className, ...delegated }) {
+function Button({ className = "", ...delegated }) {
   return (
     <button
       className={clsx("p-[4px] bg-gray-300 rounded-sm", className)}
