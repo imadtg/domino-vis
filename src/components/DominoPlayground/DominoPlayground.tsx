@@ -250,7 +250,7 @@ function Snake({
   );
 }
 
-function DominoBlock({ piece, as: Tag = "div", className = "", ...delegated }) {
+function DominoBlock({ piece, as: Tag = "div", className = "", ...delegated }: any) { /* any type is TEMPORARY!!! */
   return (
     <Tag
       className={clsx(
