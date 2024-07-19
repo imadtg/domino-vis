@@ -12,9 +12,7 @@ export default function RootLayout({ children }: Props) {
     <StoreProvider>
       <html lang="en">
         <body>
-
-            <main className={styles.main}>{children}</main>
-
+          <main className={styles.main}>{children}</main>
         </body>
       </html>
     </StoreProvider>

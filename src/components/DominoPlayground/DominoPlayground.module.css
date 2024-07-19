@@ -13,7 +13,8 @@
   background-color: peachpuff;
 }
 
-.snake, .hand {
+.snake,
+.hand {
   height: 64px;
   display: flex;
   align-items: center;

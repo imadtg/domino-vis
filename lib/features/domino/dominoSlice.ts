@@ -41,7 +41,7 @@ export const dominoSlice = createAppSlice({
           break;
         }
       }
-      gameInfo.turn = (gameInfo.turn + 1) % 2
+      gameInfo.turn = (gameInfo.turn + 1) % 2;
     }),
   }),
   selectors: {

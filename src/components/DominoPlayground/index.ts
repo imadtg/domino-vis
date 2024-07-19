@@ -1,2 +1,2 @@
-export * from './DominoPlayground';
-export { default } from './DominoPlayground';
+export * from "./DominoPlayground";
+export { default } from "./DominoPlayground";

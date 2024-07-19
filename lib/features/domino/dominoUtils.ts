@@ -27,11 +27,11 @@ export function comparePieces(
   return false;
 }
 
-export function getAllDominoes(): DominoPiece[]{
+export function getAllDominoes(): DominoPiece[] {
   let dominoes: DominoPiece[] = [];
-  for(let i = 0; i <= 6; i++){
-    for(let j = 0; j <= i; j++){
-      dominoes.push({left: i, right: j});
+  for (let i = 0; i <= 6; i++) {
+    for (let j = 0; j <= i; j++) {
+      dominoes.push({ left: i, right: j });
     }
   }
   return dominoes;
