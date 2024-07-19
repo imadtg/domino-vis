@@ -13,14 +13,19 @@ import {
 } from "@/lib/features/domino/dominoSlice";
 
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
-import styles from "./DominoPlayground.module.css";
-import { DominoPiece } from "@/lib/features/domino/dominoUtils";
+import { DominoPiece, getAllDominoes } from "@/lib/features/domino/dominoUtils";
 
 export default function DominoPlayground() {
+  return (
+    <div className="h-screen p-[32px] flex flex-col items-center justify-between gap-[32px]">
+      <DominoTable />
+      <GameInitMenu />
+    </div>
+  );
+}
+
+function GameInitMenu() {
   const dispatch = useAppDispatch();
-  const [left, setLeft] = React.useState("");
-  const [right, setRight] = React.useState("");
-  const [player, setPlayer] = React.useState("");
   const [initialGameInfo, setInitialGameInfo] = React.useState({
     turn: 0,
     snake: [],
@@ -36,51 +41,24 @@ export default function DominoPlayground() {
     ],
   });
 
-  function handleSubmitPiece(event: React.SyntheticEvent) {
+  function handleSubmit(event: React.SyntheticEvent) {
     event.preventDefault();
-    setInitialGameInfo(
-      produce((oldGameInfo) => {
-        oldGameInfo.hands[parseInt(player)].push({
-          left: parseInt(left),
-          right: parseInt(right),
-        });
-      }, initialGameInfo)
-    );
+    dispatch(initialize(initialGameInfo));
   }
 
   return (
-    <div>
-      <div className={styles.playGround}>
-        <DominoTable />
-      </div>
-      <form onSubmit={handleSubmitPiece}>
-        <label>
-          left of pip:
-          <input
-            value={left}
-            onChange={(event) => setLeft(event.target.value)}
-          />
-        </label>
-        <label>
-          right of pip:
-          <input
-            value={right}
-            onChange={(event) => setRight(event.target.value)}
-          />
-        </label>
-        <label>
-          player of pip:
-          <input
-            value={player}
-            onChange={(event) => setPlayer(event.target.value)}
-          />
-        </label>
-        <button>Add piece!</button>
+    <>
+      <form onSubmit={handleSubmit}>
+        <fieldset className="grid grid-cols-7 grid-rows-4 gap-4">
+          {getAllDominoes().map((piece) => (
+            <div key={`${piece.left}-${piece.right}`}>
+              [{piece.left}|{piece.right}]
+            </div>
+          ))}
+        </fieldset>
+        <button>Initialize!</button>
       </form>
-      <button onClick={() => dispatch(initialize(initialGameInfo))}>
-        Initialize!
-      </button>
-    </div>
+    </>
   );
 }
 
@@ -125,13 +103,15 @@ function Hand({
 }) {
   const PieceTag = onPieceClick ? "button" : "div";
   return (
-    <div className={styles.hand}>
+    <div className="h-[64px] flex items-center gap-[8px]">
       {hand?.map((piece) => (
         <PieceTag
-          className={styles.dominoPiece}
+          className="p-[8px] bg-green-600"
           key={`${piece.left}-${piece.right}`}
           onClick={() => onPieceClick?.(piece)}
-        >{`[${piece.left}|${piece.right}]`}</PieceTag>
+        >
+          [{piece.left}|{piece.right}]
+        </PieceTag>
       ))}
     </div>
   );
@@ -147,14 +127,16 @@ function Snake({
 }) {
   const PieceTag = onPieceClick ? "button" : "div";
   return (
-    <div className={styles.snake}>
+    <div className="h-[64px] flex items-center gap-[8px]">
       {onSideClick && <button onClick={() => onSideClick("left")}>left</button>}
       {snake?.map((piece) => (
         <PieceTag
-          className={styles.dominoPiece}
+          className="p-[8px] bg-green-600"
           key={`${piece.left}-${piece.right}`}
           onClick={() => onPieceClick?.(piece)}
-        >{`[${piece.left}|${piece.right}]`}</PieceTag>
+        >
+          [{piece.left}|{piece.right}]
+        </PieceTag>
       ))}
       {onSideClick && (
         <button onClick={() => onSideClick("right")}>right</button>

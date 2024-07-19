@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { StoreProvider } from "./StoreProvider";
 import "./globals.css";
-import styles from "./layout.module.css";
 
 interface Props {
   readonly children: ReactNode;
@@ -12,7 +11,7 @@ export default function RootLayout({ children }: Props) {
     <StoreProvider>
       <html lang="en">
         <body>
-          <main className={styles.main}>{children}</main>
+          <main className="flex flex-col items-center justify-center">{children}</main>
         </body>
       </html>
     </StoreProvider>
