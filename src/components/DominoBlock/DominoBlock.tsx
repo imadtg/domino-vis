@@ -30,7 +30,7 @@ function DominoBlock({
   return (
     <Tag
       className={clsx(
-        "p-[8px] border-black border rounded-lg grid place-content-center",
+        "p-[8px] border-black border rounded-lg grid place-content-center h-[32px] w-[48px]",
         className
       )}
       {...delegated}

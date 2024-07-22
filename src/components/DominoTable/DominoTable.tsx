@@ -38,20 +38,27 @@ function DominoTable() {
     setChosenPiece(undefined);
   }
   return (
-    <>
+    <div className="min-h-10 flex flex-col items-center flex-1 justify-between">
       <Hand
         hand={firstPlayerHand}
         onPieceClick={turn == 0 ? (piece) => setChosenPiece(piece) : undefined}
       />
-      <Snake
-        snake={snake}
-        onSideClick={chosenPiece ? handlePlayChosenPiece : undefined}
-      />
+      <div className="relative">
+        {chosenPiece && (
+          <button className="absolute top-0 bottom-0 left-[-8px] transform -translate-x-full" onClick={() => handlePlayChosenPiece("left")}>left</button>
+        )}
+        <Snake
+          snake={snake}
+        />
+        {chosenPiece && (
+          <button className="absolute top-0 bottom-0 right-[-8px] transform translate-x-full" onClick={() => handlePlayChosenPiece("right")}>right</button>
+        )}
+      </div>
       <Hand
         hand={secondPlayerHand}
         onPieceClick={turn == 1 ? (piece) => setChosenPiece(piece) : undefined}
       />
-    </>
+    </div>
   );
 }
 
