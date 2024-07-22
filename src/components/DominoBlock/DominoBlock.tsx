@@ -20,14 +20,23 @@ import {
 } from "@/lib/features/domino/dominoUtils";
 import clsx from "clsx";
 
-import DominoTable from "@/src/components/DominoTable";
-import GameInitMenu from "@/src/components/GameInitMenu";
-
-export default function DominoPlayground() {
+function DominoBlock({
+  piece,
+  as: Tag = "div",
+  className = "",
+  ...delegated
+}: any) {
+  /* any type is TEMPORARY!!! */
   return (
-    <div className="h-screen p-[64px] flex flex-col items-center justify-between gap-[32px]">
-      <DominoTable />
-      <GameInitMenu />
-    </div>
+    <Tag
+      className={clsx(
+        "p-[8px] border-black border rounded-lg grid place-content-center",
+        className
+      )}
+      {...delegated}
+    >
+      [{piece.left}|{piece.right}]
+    </Tag>
   );
 }
+export default DominoBlock;
