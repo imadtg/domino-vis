@@ -20,22 +20,24 @@ import {
 } from "@/lib/features/domino/dominoUtils";
 import clsx from "clsx";
 import DominoBlock from "../DominoBlock";
+import { ProcessedDominoPiece } from "../DominoTable";
 
 function Hand({
-  hand,
+  processedHand,
   onPieceClick,
 }: {
-  hand?: DominoPiece[];
+  processedHand?: ProcessedDominoPiece[];
   onPieceClick?: (piece: DominoPiece) => void;
 }) {
   return (
     <div className="h-[64px] flex items-center gap-[8px]">
-      {hand?.map((piece) => (
+      {processedHand?.map(({ piece, playable }) => (
         <DominoBlock
-          as={onPieceClick ? "button" : "div"}
+          as={playable ? "button" : "div"}
           key={`${piece.left}-${piece.right}`}
-          onClick={() => onPieceClick?.(piece)}
+          onClick={playable && (() => onPieceClick?.(piece))}
           piece={piece}
+          highlighted={playable}
         />
       ))}
     </div>

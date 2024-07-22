@@ -25,7 +25,7 @@ import GameInitMenu from "@/src/components/GameInitMenu";
 
 export default function DominoPlayground() {
   return (
-    <div className="h-screen p-[64px] flex flex-col items-center justify-between gap-[32px]">
+    <div className="h-screen p-[64px] flex flex-col items-center justify-between gap-[32px] w-fit">
       <DominoTable />
       <GameInitMenu />
     </div>

@@ -24,6 +24,7 @@ function DominoBlock({
   piece,
   as: Tag = "div",
   className = "",
+  highlighted = false,
   ...delegated
 }: any) {
   /* any type is TEMPORARY!!! */
@@ -31,6 +32,7 @@ function DominoBlock({
     <Tag
       className={clsx(
         "p-[8px] border-black border rounded-lg grid place-content-center h-[32px] w-[48px]",
+        highlighted && "outline outline-[4px] outline-blue-500",
         className
       )}
       {...delegated}
