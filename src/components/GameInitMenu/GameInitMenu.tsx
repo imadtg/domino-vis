@@ -2,23 +2,15 @@
 import * as React from "react";
 import { produce } from "immer";
 
-import {
-  initialize,
-  playMove,
-  selectHand,
-  selectSnake,
-  selectStatus,
-  selectTurn,
-} from "@/lib/features/domino/dominoSlice";
+import { initialize } from "@/lib/features/domino/dominoSlice";
 
-import { useAppDispatch, useAppSelector } from "@/lib/hooks";
+import { useAppDispatch } from "@/lib/hooks";
 import {
   comparePieces,
   DominoIngameInfo,
   DominoPiece,
   getAllDominoes,
 } from "@/lib/features/domino/dominoUtils";
-import clsx from "clsx";
 import DominoBlock from "../DominoBlock";
 import Button from "../Button";
 
@@ -42,7 +34,7 @@ function GameInitMenu() {
     if ((event.target as HTMLInputElement).checked) {
       if (
         initialGameInfo.hands[(player + 1) % 2].some((pieceOfHand) =>
-          comparePieces(piece, pieceOfHand)
+          comparePieces(piece, pieceOfHand),
         )
       ) {
         window.alert("That piece is taken!");
@@ -51,16 +43,16 @@ function GameInitMenu() {
       setInitialGameInfo(
         produce((oldGameInfo) => {
           oldGameInfo.hands[player].push(piece);
-        }, initialGameInfo)
+        }, initialGameInfo),
       );
     } else {
       const index = initialGameInfo.hands[player].findIndex((pieceOfHand) =>
-        comparePieces(piece, pieceOfHand)
+        comparePieces(piece, pieceOfHand),
       );
       setInitialGameInfo(
         produce((oldGameInfo) => {
           oldGameInfo.hands[player].splice(index, 1);
-        }, initialGameInfo)
+        }, initialGameInfo),
       );
     }
   }
@@ -69,7 +61,7 @@ function GameInitMenu() {
     setInitialGameInfo(
       produce((oldGameInfo) => {
         oldGameInfo.hands = [[], []];
-      }, initialGameInfo)
+      }, initialGameInfo),
     );
   }
 
@@ -77,7 +69,7 @@ function GameInitMenu() {
     setInitialGameInfo(
       produce((oldGameInfo) => {
         oldGameInfo.hands[player] = [];
-      }, initialGameInfo)
+      }, initialGameInfo),
     );
   }
 
@@ -86,16 +78,13 @@ function GameInitMenu() {
     const remainingDominoes = dominoes.filter(
       (piece) =>
         !initialGameInfo.hands[(player + 1) % 2].some((handInOtherPiece) =>
-          comparePieces(piece, handInOtherPiece)
-        )
+          comparePieces(piece, handInOtherPiece),
+        ),
     );
-    remainingDominoes.forEach(({ left, right }) => {
-      console.log(`piece [${left}|${right}] is not present in the other hand`);
-    });
     setInitialGameInfo(
       produce((oldGameInfo) => {
         oldGameInfo.hands[player] = remainingDominoes;
-      }, initialGameInfo)
+      }, initialGameInfo),
     );
   }
 
@@ -106,16 +95,16 @@ function GameInitMenu() {
         className="grid justify-items-center gap-y-[16px]"
       >
         <fieldset className="grid grid-cols-7 grid-rows-4 gap-[16px]">
-          <legend className="absolute transform -translate-y-[120%] -translate-x-1/2">
+          <legend className="absolute -translate-x-1/2 -translate-y-[120%] transform">
             Choose dominoes for the {player === 0 ? "first" : "second"} player:
           </legend>
           {getAllDominoes().map((piece) => {
             const pieceId = `${piece.left}-${piece.right}`;
             const checked = initialGameInfo.hands[player].some((pieceOfHand) =>
-              comparePieces(piece, pieceOfHand)
+              comparePieces(piece, pieceOfHand),
             );
             const isTaken = initialGameInfo.hands[(player + 1) % 2].some(
-              (pieceOfHand) => comparePieces(piece, pieceOfHand)
+              (pieceOfHand) => comparePieces(piece, pieceOfHand),
             );
             const className = isTaken
               ? "bg-gray-800 text-white"
@@ -139,18 +128,18 @@ function GameInitMenu() {
             );
           })}
         </fieldset>
-        <div className="flex justify-between px-[8px] gap-[16px]">
+        <div className="flex justify-between gap-[16px] px-[8px]">
           <Button type="button" onClick={() => setPlayer((player + 1) % 2)}>
             Switch player
           </Button>
           {initialGameInfo.hands[0].length + initialGameInfo.hands[1].length ===
           28 ? (
             <Button onClick={handleRemoveSelection} type="button">
-              Remove {player === 0 ? "first" : "second"} player's selection
+              Remove current player selection
             </Button>
           ) : (
             <Button onClick={handleSelectAll} type="button">
-              Select the rest for the {player === 0 ? "first" : "second"} player
+              Select the rest
             </Button>
           )}
           <Button onClick={handleRemoveAllSelection}>
