@@ -16,8 +16,8 @@ export let ModuleState: { Module?: any; game?: number } = {};
 
 // Add one or more listener entries that look for specific actions.
 // They may contain any sync or async logic, similar to thunks.
-listenerMiddleware.startListening({
-  actionCreator: initialize,
+listenerMiddleware.startListening({/* @ts-ignore */
+  actionCreator: initialize,/* @ts-ignore */
   effect: async (action: PayloadAction<DominoIngameInfo>, listenerApi) => {
     // Run whatever additional side-effect-y logic you want here
     console.log("Wasm middleware listened for initialize: ", action.payload);
@@ -46,6 +46,7 @@ listenerMiddleware.startListening({
     console.log("Wasm middleware listened for playMove: ", action.payload);
     console.log("ModuleState :", ModuleState);
     const { move } = newMovesContext(ModuleState.Module); // THIS IS A MEMORY LEAK!!!
+    /* @ts-ignore */
     const { dominoGame } = listenerApi.getState();
     const { gameInfo } = dominoGame;
     let shouldTurnPieceAround: boolean;
