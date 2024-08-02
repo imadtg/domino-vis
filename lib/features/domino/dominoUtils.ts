@@ -3,9 +3,11 @@ export interface DominoPiece {
   right: number;
 }
 
+export type Side = "left" | "right";
+
 export interface Move {
   piece: DominoPiece;
-  side: "left" | "right";
+  side: Side;
 }
 
 export interface DominoIngameInfo {
@@ -27,6 +29,10 @@ export function comparePieces(
   return false;
 }
 
+export function turnAround({left, right}: DominoPiece): DominoPiece {
+  return {left: right, right: left};
+}
+
 export function getAllDominoes(): DominoPiece[] {
   let dominoes: DominoPiece[] = [];
   for (let i = 0; i <= 6; i++) {
@@ -35,4 +41,18 @@ export function getAllDominoes(): DominoPiece[] {
     }
   }
   return dominoes;
+}
+
+export function getPlayableSides(snake: DominoPiece[], piece: DominoPiece): Side[] {
+  if (snake.length === 0) {
+    return ["left", "right"];
+  }
+  let sides = [] as Side[];
+  if (snake[0].left === piece.right || snake[0].left === piece.left) {
+    sides.push("left");
+  }
+  if (snake.at(-1)?.right === piece.right || snake.at(-1)?.right === piece.left) {
+    sides.push("right");
+  } 
+  return sides;
 }

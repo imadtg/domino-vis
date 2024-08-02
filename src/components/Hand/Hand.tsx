@@ -35,7 +35,7 @@ function Hand({
         <DominoBlock
           as={playable ? "button" : "div"}
           key={`${piece.left}-${piece.right}`}
-          onClick={playable && (() => onPieceClick?.(piece))}
+          onClick={playable ? (() => onPieceClick?.(piece)) : undefined}
           piece={piece}
           highlighted={playable}
         />

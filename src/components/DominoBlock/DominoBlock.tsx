@@ -31,7 +31,7 @@ function DominoBlock({
   return (
     <Tag
       className={clsx(
-        "p-[8px] border-black border rounded-lg grid place-content-center h-[32px] w-[48px]",
+        "p-[8px] border-black border rounded-lg grid place-content-center h-[32px] w-[48px] select-none focus:outline-black",
         highlighted && "outline outline-[4px] outline-blue-500",
         className
       )}

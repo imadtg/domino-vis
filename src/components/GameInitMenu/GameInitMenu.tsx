@@ -20,6 +20,7 @@ import {
 } from "@/lib/features/domino/dominoUtils";
 import clsx from "clsx";
 import DominoBlock from "../DominoBlock";
+import Button from "../Button";
 
 function GameInitMenu() {
   const dispatch = useAppDispatch();
@@ -33,7 +34,7 @@ function GameInitMenu() {
   const [player, setPlayer] = React.useState(0);
 
   function handleSubmit(event: React.SyntheticEvent) {
-    event.preventDefault();
+    event.preventDefault(); /* @ts-ignore */
     dispatch(initialize(initialGameInfo));
   }
 
@@ -122,13 +123,13 @@ function GameInitMenu() {
                 ? "bg-yellow-300"
                 : "";
             return (
-              <div key={pieceId} className="relative">
+              <div key={pieceId} className="relative focus-within:outline">
                 <label htmlFor={pieceId}>
                   <DominoBlock piece={piece} className={className} />
                 </label>
                 <input
                   id={pieceId}
-                  className="absolute inset-0 invisible"
+                  className="absolute inset-0 opacity-0"
                   type="checkbox"
                   value={`${piece.left}-${piece.right}`}
                   checked={checked}
@@ -159,15 +160,6 @@ function GameInitMenu() {
         </div>
       </form>
     </>
-  );
-}
-
-function Button({ className = "", ...delegated }) {
-  return (
-    <button
-      className={clsx("p-[4px] bg-gray-300 rounded-sm", className)}
-      {...delegated}
-    />
   );
 }
 

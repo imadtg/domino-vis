@@ -16,7 +16,9 @@ import {
   comparePieces,
   DominoIngameInfo,
   DominoPiece,
+  Side,
   getAllDominoes,
+  getPlayableSides,
 } from "@/lib/features/domino/dominoUtils";
 import clsx from "clsx";
 
@@ -28,8 +30,6 @@ export interface ProcessedDominoPiece {
   playable: boolean;
 }
 
-type Side = "left" | "right";
-
 function DominoTable() {
   const dispatch = useAppDispatch();
   const turn = useAppSelector(selectTurn);
@@ -37,30 +37,14 @@ function DominoTable() {
   const secondPlayerHand = useAppSelector((state) => selectHand(state, 1));
   const snake = useAppSelector(selectSnake);
   const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>();
-  const processedFirstHand = firstPlayerHand?.map((piece) => {
-    const sides = getPlayableSides(piece);
-    return { piece, playable: sides?.length > 0 && turn === 0};
+  const processedFirstHand = firstPlayerHand?.map((piece: DominoPiece) => {
+    const sides = getPlayableSides(snake, piece);
+    return { piece, playable: sides?.length > 0 && turn === 0 };
   });
-  const processedSecondHand = secondPlayerHand?.map((piece) => {
-    const sides = getPlayableSides(piece);
-    return { piece, playable: sides?.length > 0 && turn === 1};
+  const processedSecondHand = secondPlayerHand?.map((piece: DominoPiece) => {
+    const sides = getPlayableSides(snake, piece);
+    return { piece, playable: sides?.length > 0 && turn === 1 };
   });
-  function getPlayableSides(piece: DominoPiece): Side[] {
-    if (snake === undefined || snake.length === 0) {
-      return ["left", "right"];
-    }
-    let sides = [];
-    if (snake[0].left === piece.right || snake[0].left === piece.left) {
-      sides.push("left");
-    }
-    if (
-      snake.at(-1).right === piece.right ||
-      snake.at(-1).right === piece.left
-    ) {
-      sides.push("right");
-    }
-    return sides;
-  }
   function handlePlayChosenPiece(side: "left" | "right") {
     if (!chosenPiece) {
       return;
@@ -70,34 +54,34 @@ function DominoTable() {
   }
 
   return (
-    <div className="min-h-10 flex flex-col items-center flex-1 justify-between">
+    <div className="flex min-h-10 flex-1 flex-col items-center justify-between">
       <Hand
         processedHand={processedFirstHand}
         onPieceClick={turn == 0 ? (piece) => setChosenPiece(piece) : undefined}
       />
       <div className="relative">
-        {chosenPiece && (
-          <button
-            className="absolute top-0 bottom-0 left-[-8px] transform -translate-x-full"
-            onClick={() => handlePlayChosenPiece("left")}
-          >
-            left
-          </button>
-        )}
+        {chosenPiece &&
+          getPlayableSides(snake, chosenPiece).includes("left") && (
+            <button
+              className="absolute bottom-0 left-[-8px] top-0 -translate-x-full transform"
+              onClick={() => handlePlayChosenPiece("left")}
+            >
+              left
+            </button>
+          )}
         <Snake snake={snake} />
-        {chosenPiece && (
-          <button
-            className="absolute top-0 bottom-0 right-[-8px] transform translate-x-full"
-            onClick={() => handlePlayChosenPiece("right")}
-          >
-            right
-          </button>
-        )}
+        {chosenPiece &&
+          getPlayableSides(snake, chosenPiece).includes("right") && (
+            <button
+              className="absolute bottom-0 right-[-8px] top-0 translate-x-full transform"
+              onClick={() => handlePlayChosenPiece("right")}
+            >
+              right
+            </button>
+          )}
       </div>
       <Hand
-        processedHand = {
-          processedSecondHand
-        }
+        processedHand={processedSecondHand}
         onPieceClick={turn == 1 ? (piece) => setChosenPiece(piece) : undefined}
       />
     </div>
