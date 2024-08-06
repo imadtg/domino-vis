@@ -1,43 +1,46 @@
 "use client";
 import * as React from "react";
-import { produce } from "immer";
-
-import {
-  initialize,
-  playMove,
-  selectHand,
-  selectSnake,
-  selectStatus,
-  selectTurn,
-} from "@/lib/features/domino/dominoSlice";
-
-import { useAppDispatch, useAppSelector } from "@/lib/hooks";
-import {
-  comparePieces,
-  DominoIngameInfo,
-  DominoPiece,
-  getAllDominoes,
-} from "@/lib/features/domino/dominoUtils";
 import clsx from "clsx";
+import DominoIcon from "./DominoIcon";
 
 function DominoBlock({
   piece,
   as: Tag = "div",
   className = "",
+  dominoGroupId = "global",
   highlighted = false,
+  orientation = "vertical",
   ...delegated
 }: any) {
-  /* any type is TEMPORARY!!! */
+  const isHorizontal = orientation === "horizontal";
+  const aspectRatio = isHorizontal ? 2 : 0.5;
+
   return (
     <Tag
       className={clsx(
-        "p-[8px] border-black border rounded-lg grid place-content-center h-[32px] w-[48px] select-none focus:outline-black",
+        "focus:outline-black",
         highlighted && "outline outline-[4px] outline-blue-500",
-        className
+        isHorizontal ? "w-32" : "w-16", // TODO: calculate this from the aspect ratio and a size variable
+        className,
       )}
       {...delegated}
     >
-      [{piece.left}|{piece.right}]
+      <div // a hacky way to implement aspect ratios, this acts as the containing block for the icon and dynamically changes aspect ratio to respect layout.
+        style={{ // not using tailwind because we need interpolation and most of these properties serve the same purpose.
+          position: "relative",
+          boxSizing: "content-box",
+          height: 0,
+          paddingBottom: `${100 / aspectRatio}%`,
+        }}
+      >
+        <DominoIcon
+          left={piece.left}
+          right={piece.right}
+          dominoGroupId={dominoGroupId}
+          orientation={orientation}
+          aspectRatio={aspectRatio}
+        />
+      </div>
     </Tag>
   );
 }

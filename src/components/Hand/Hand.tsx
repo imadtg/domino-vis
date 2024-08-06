@@ -30,7 +30,7 @@ function Hand({
   onPieceClick?: (piece: DominoPiece) => void;
 }) {
   return (
-    <div className="h-[64px] flex items-center gap-[8px]">
+    <div className="h-[128px] flex items-center gap-[12px]">
       {processedHand?.map(({ piece, playable }) => (
         <DominoBlock
           as={playable ? "button" : "div"}
@@ -38,6 +38,7 @@ function Hand({
           onClick={playable ? (() => onPieceClick?.(piece)) : undefined}
           piece={piece}
           highlighted={playable}
+          orientation="vertical"
         />
       ))}
     </div>

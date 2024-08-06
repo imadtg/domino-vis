@@ -85,6 +85,7 @@ function DominoAiMenu({ className }: any) {
           <DominoBlock
             as="span"
             className="inline-block"
+            dominoGroupId="ai-move-preview"
             piece={bestMove.piece}
           />{" "}
           on the {bestMove.side},{" "}

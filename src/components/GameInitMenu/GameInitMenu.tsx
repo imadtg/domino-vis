@@ -92,7 +92,7 @@ function GameInitMenu() {
     <>
       <form
         onSubmit={handleSubmit}
-        className="grid justify-items-center gap-y-[16px]"
+        className="grid justify-items-center gap-y-[16px] p-[8px]"
       >
         <fieldset className="grid grid-cols-7 grid-rows-4 gap-[16px]">
           <legend className="absolute -translate-x-1/2 -translate-y-[120%] transform">
@@ -112,9 +112,16 @@ function GameInitMenu() {
                 ? "bg-yellow-300"
                 : "";
             return (
-              <div key={pieceId} className="relative focus-within:outline">
+              <div
+                key={pieceId}
+                className="relative w-[128px] focus-within:outline"
+              >
                 <label htmlFor={pieceId}>
-                  <DominoBlock piece={piece} className={className} />
+                  <DominoBlock
+                    piece={piece}
+                    className={className}
+                    orientation="horizontal"
+                  />
                 </label>
                 <input
                   id={pieceId}

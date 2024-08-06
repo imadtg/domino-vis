@@ -54,7 +54,7 @@ function DominoTable() {
   }
 
   return (
-    <div className="flex min-h-10 flex-1 flex-col items-center justify-between">
+    <div className="flex h-full flex-col items-center justify-between">
       <Hand
         processedHand={processedFirstHand}
         onPieceClick={turn == 0 ? (piece) => setChosenPiece(piece) : undefined}
