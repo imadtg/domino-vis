@@ -4,8 +4,10 @@ import { produce } from "immer";
 
 import {
   initialize,
+  pass,
   playMove,
-  selectHand,
+  selectHands,
+  selectIsBlocked,
   selectSnake,
   selectStatus,
   selectTurn,
@@ -33,19 +35,35 @@ export interface ProcessedDominoPiece {
 
 function DominoTable() {
   const dispatch = useAppDispatch();
-  const turn = useAppSelector(selectTurn);
-  const firstPlayerHand = useAppSelector((state) => selectHand(state, 0));
-  const secondPlayerHand = useAppSelector((state) => selectHand(state, 1));
+  const firstPlayer = 0;
+  const secondPlayer = 1;
+  const turn: number = useAppSelector(selectTurn);
+  const hands = useAppSelector(selectHands);
   const snake = useAppSelector(selectSnake);
+  const isBlocked = useAppSelector(selectIsBlocked);
   const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
-  const processedFirstHand = firstPlayerHand?.map((piece: DominoPiece) => {
-    const sides = getPlayableSides(snake, piece);
-    return { piece, playable: sides?.length > 0 && turn === 0 };
-  });
-  const processedSecondHand = secondPlayerHand?.map((piece: DominoPiece) => {
-    const sides = getPlayableSides(snake, piece);
-    return { piece, playable: sides?.length > 0 && turn === 1 };
-  });
+  const gameStatus = useAppSelector(selectStatus);
+
+  if (gameStatus === "uninitialized") {
+    // this is supposed to give typescript more type narrowing power, but the tagged union needs to be fixed first in dominoSlice.
+    return;
+  }
+
+  const processedHands: ProcessedDominoPiece[][] = hands?.map(
+    (hand: DominoPiece[], player: number) =>
+      hand.map((piece: DominoPiece) => {
+        const sides = getPlayableSides(snake, piece);
+        return {
+          piece,
+          playable: sides?.length > 0 && turn === player,
+        };
+      }),
+  );
+
+  if (!processedHands[turn].some(({ playable }) => playable) && !isBlocked) {
+    dispatch(pass());
+  }
+
   function handlePlayChosenPiece(side: "left" | "right") {
     if (!chosenPiece) {
       return;
@@ -78,9 +96,9 @@ function DominoTable() {
   return (
     <div className="flex h-full flex-col items-center justify-between">
       <Hand
-        processedHand={processedFirstHand}
+        processedHand={processedHands[firstPlayer]}
         onPieceClick={
-          turn == 0 ? (piece) => handleClickPiece(piece) : undefined
+          turn == firstPlayer ? (piece) => handleClickPiece(piece) : undefined
         }
       />
       <div className="relative flex items-center">
@@ -103,9 +121,9 @@ function DominoTable() {
         )}
       </div>
       <Hand
-        processedHand={processedSecondHand}
+        processedHand={processedHands[secondPlayer]}
         onPieceClick={
-          turn == 1 ? (piece) => handleClickPiece(piece) : undefined
+          turn == secondPlayer ? (piece) => handleClickPiece(piece) : undefined
         }
       />
     </div>
