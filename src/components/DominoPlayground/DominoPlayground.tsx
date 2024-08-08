@@ -11,7 +11,7 @@ export default function DominoPlayground() {
   const gameStatus = useAppSelector(({ dominoGame }) => dominoGame.gameStatus);
   return (
     <LayoutGroup>
-      <div className="grid h-screen place-items-center p-[32px]">
+      <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
         {gameStatus === "uninitialized" ? (
           <GameInitMenu />
         ) : (

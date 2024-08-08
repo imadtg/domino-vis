@@ -24,6 +24,7 @@ import clsx from "clsx";
 
 import Snake from "@/src/components/Snake";
 import Hand from "@/src/components/Hand";
+import Button from "../Button";
 
 export interface ProcessedDominoPiece {
   piece: DominoPiece;
@@ -36,7 +37,7 @@ function DominoTable() {
   const firstPlayerHand = useAppSelector((state) => selectHand(state, 0));
   const secondPlayerHand = useAppSelector((state) => selectHand(state, 1));
   const snake = useAppSelector(selectSnake);
-  const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>();
+  const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
   const processedFirstHand = firstPlayerHand?.map((piece: DominoPiece) => {
     const sides = getPlayableSides(snake, piece);
     return { piece, playable: sides?.length > 0 && turn === 0 };
@@ -53,36 +54,59 @@ function DominoTable() {
     setChosenPiece(undefined);
   }
 
+  function handleClickPiece(piece: DominoPiece) {
+    // TODO: check if the piece is in the hand of the player whose turn it is.
+    if (snake.length === 0) {
+      // first move is played automatically
+      dispatch(playMove({ piece, side: "left" })); // choosing left arbitrarily since it doesn't matter.
+      return;
+    }
+    const sides = getPlayableSides(snake, piece);
+    if (sides.length === 0) {
+      // this should be an impossible state
+      debugger; // TODO: remove this or remove branch.
+      return;
+    }
+    if (sides.length > 1) {
+      setChosenPiece(piece);
+      return;
+    }
+    // automatically play domino if there is only one side for it to be played in
+    dispatch(playMove({ piece, side: sides[0] }));
+  }
+
   return (
     <div className="flex h-full flex-col items-center justify-between">
       <Hand
         processedHand={processedFirstHand}
-        onPieceClick={turn == 0 ? (piece) => setChosenPiece(piece) : undefined}
+        onPieceClick={
+          turn == 0 ? (piece) => handleClickPiece(piece) : undefined
+        }
       />
-      <div className="relative">
-        {chosenPiece &&
-          getPlayableSides(snake, chosenPiece).includes("left") && (
-            <button
-              className="absolute bottom-0 left-[-8px] top-0 -translate-x-full transform"
-              onClick={() => handlePlayChosenPiece("left")}
-            >
-              left
-            </button>
-          )}
+      <div className="relative flex items-center">
+        {chosenPiece && (
+          <Button
+            className="absolute left-[-8px] -translate-x-full transform"
+            onClick={() => handlePlayChosenPiece("left")}
+          >
+            left
+          </Button>
+        )}
         <Snake snake={snake} />
-        {chosenPiece &&
-          getPlayableSides(snake, chosenPiece).includes("right") && (
-            <button
-              className="absolute bottom-0 right-[-8px] top-0 translate-x-full transform"
-              onClick={() => handlePlayChosenPiece("right")}
-            >
-              right
-            </button>
-          )}
+        {chosenPiece && (
+          <Button
+            className="absolute right-[-8px] translate-x-full transform"
+            onClick={() => handlePlayChosenPiece("right")}
+          >
+            right
+          </Button>
+        )}
       </div>
       <Hand
         processedHand={processedSecondHand}
-        onPieceClick={turn == 1 ? (piece) => setChosenPiece(piece) : undefined}
+        onPieceClick={
+          turn == 1 ? (piece) => handleClickPiece(piece) : undefined
+        }
       />
     </div>
   );

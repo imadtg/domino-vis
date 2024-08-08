@@ -31,7 +31,7 @@ function Snake({
   onSideClick?: (side: "left" | "right") => void;
 }) {
   return (
-    <div className="flex h-[64px] items-center gap-[8px]">
+    <div className="flex h-[64px] items-center gap-[2px] sm:gap-[4px] md:gap-[8px] lg:gap-[12px]">
       {onSideClick && <button onClick={() => onSideClick("left")}>left</button>}
       {snake?.map((piece) => (
         <DominoBlock

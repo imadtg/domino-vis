@@ -1,32 +1,49 @@
 "use client";
 import * as React from "react";
-import clsx from "clsx";
 import DominoIcon from "./DominoIcon";
+import clsx from "clsx";
+
+const VARIANT_COLORS = {
+  greyed: "#181717",
+  highlighted: "#76d9eb",
+  chosen: "#fbff00",
+  default: "#D9D9D9", // this is here for additional redunduncy, see DominoSvg
+};
 
 function DominoBlock({
   piece,
   as: Tag = "div",
   className = "",
+  style = {},
   dominoGroupId = "global",
-  highlighted = false,
+  variant = "default" /* greyed-out | highlighted | chosen | default */,
   orientation = "vertical",
   ...delegated
 }: any) {
   const isHorizontal = orientation === "horizontal";
   const aspectRatio = isHorizontal ? 2 : 0.5;
+  const size = 6;
+  const widthFraction = isHorizontal ? 2 : 1; // TODO: calculate this and aspect ratio from eachother or another source, this feels redundant
 
   return (
     <Tag
-      className={clsx(
-        "focus:outline-black",
-        highlighted && "outline outline-[4px] outline-blue-500",
-        isHorizontal ? "w-32" : "w-16", // TODO: calculate this from the aspect ratio and a size variable
-        className,
-      )}
+      className={clsx("outline-offset-2", className)}
+      style={
+        {
+          "--domino-size": size,
+          "--domino-width-scale": size * widthFraction,
+          /* @ts-ignore */
+          "--domino-body-color": VARIANT_COLORS[variant],
+          ...style,
+          // i'm starting to miss styled-components...
+          width: `calc(clamp(6px , 1vw, 10px) * var(--domino-width-scale))`, // TODO: untangle unitless and unit mess
+        } as React.CSSProperties
+      }
       {...delegated}
     >
       <div // a hacky way to implement aspect ratios, this acts as the containing block for the icon and dynamically changes aspect ratio to respect layout.
-        style={{ // not using tailwind because we need interpolation and most of these properties serve the same purpose.
+        style={{
+          // not using tailwind because we need interpolation and most of these properties serve the same purpose.
           position: "relative",
           boxSizing: "content-box",
           height: 0,

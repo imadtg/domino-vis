@@ -11,7 +11,9 @@ export default function RootLayout({ children }: Props) {
     <StoreProvider>
       <html lang="en">
         <body>
-          <main className="flex flex-col items-center justify-center">{children}</main>
+          <main className="flex flex-col items-center justify-center overflow-hidden">
+            {children}
+          </main>
         </body>
       </html>
     </StoreProvider>

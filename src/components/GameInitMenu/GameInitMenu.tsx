@@ -16,18 +16,31 @@ import Button from "../Button";
 
 function GameInitMenu() {
   const dispatch = useAppDispatch();
-  const [initialGameInfo, setInitialGameInfo] =
+  const [initialGameInfo, setInitialGameInfo] = // TODO: move the temporary state into the domino slice.
     React.useState<DominoIngameInfo>({
       turn: 0,
       snake: [],
       hands: [[], []],
     });
 
-  const [player, setPlayer] = React.useState(0);
+  const player = 0;
 
   function handleSubmit(event: React.SyntheticEvent) {
-    event.preventDefault(); /* @ts-ignore */
-    dispatch(initialize(initialGameInfo));
+    event.preventDefault();
+    if (
+      initialGameInfo.hands[0].length + initialGameInfo.hands[1].length ===
+      0
+    ) {
+      if (
+        !window.confirm(
+          "Not selecting any domino will give all the dominoes to one player, do you wish proceed?",
+        )
+      ) {
+        return;
+      }
+    }
+    /* @ts-ignore */
+    dispatch(initialize(withSelectRest(initialGameInfo)));
   }
 
   function handleCheck(event: React.SyntheticEvent, piece: DominoPiece) {
@@ -65,97 +78,65 @@ function GameInitMenu() {
     );
   }
 
-  function handleRemoveSelection() {
-    setInitialGameInfo(
-      produce((oldGameInfo) => {
-        oldGameInfo.hands[player] = [];
-      }, initialGameInfo),
-    );
-  }
-
-  function handleSelectAll() {
+  function withSelectRest(gameInfo: DominoIngameInfo) {
+    // TODO: rewrite this.
     const dominoes = getAllDominoes();
     const remainingDominoes = dominoes.filter(
       (piece) =>
-        !initialGameInfo.hands[(player + 1) % 2].some((handInOtherPiece) =>
+        !gameInfo.hands[player].some((handInOtherPiece) =>
           comparePieces(piece, handInOtherPiece),
         ),
     );
-    setInitialGameInfo(
-      produce((oldGameInfo) => {
-        oldGameInfo.hands[player] = remainingDominoes;
-      }, initialGameInfo),
-    );
+    return produce((oldGameInfo) => {
+      oldGameInfo.hands[(player + 1) % 2] = remainingDominoes;
+    })(gameInfo); // i wonder how produce doesn't break in the other overloads used in the codebase...
   }
 
   return (
-    <>
-      <form
-        onSubmit={handleSubmit}
-        className="grid justify-items-center gap-y-[16px] p-[8px]"
-      >
-        <fieldset className="grid grid-cols-7 grid-rows-4 gap-[16px]">
-          <legend className="absolute -translate-x-1/2 -translate-y-[120%] transform">
-            Choose dominoes for the {player === 0 ? "first" : "second"} player:
-          </legend>
-          {getAllDominoes().map((piece) => {
-            const pieceId = `${piece.left}-${piece.right}`;
-            const checked = initialGameInfo.hands[player].some((pieceOfHand) =>
-              comparePieces(piece, pieceOfHand),
-            );
-            const isTaken = initialGameInfo.hands[(player + 1) % 2].some(
-              (pieceOfHand) => comparePieces(piece, pieceOfHand),
-            );
-            const className = isTaken
-              ? "bg-gray-800 text-white"
-              : checked
-                ? "bg-yellow-300"
-                : "";
-            return (
-              <div
-                key={pieceId}
-                className="relative w-[128px] focus-within:outline"
-              >
-                <label htmlFor={pieceId}>
-                  <DominoBlock
-                    piece={piece}
-                    className={className}
-                    orientation="horizontal"
-                  />
-                </label>
-                <input
-                  id={pieceId}
-                  className="absolute inset-0 opacity-0"
-                  type="checkbox"
-                  value={`${piece.left}-${piece.right}`}
-                  checked={checked}
-                  onChange={(event) => handleCheck(event, piece)}
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col justify-items-center gap-y-[16px] p-[8px]"
+    >
+      <fieldset className="grid grid-cols-4 grid-rows-7 gap-[16px] p-[1em] landscape:grid-cols-7 landscape:grid-rows-4">
+        <legend className="absolute -translate-y-[100%] transform">
+          Choose dominoes for the {player === 0 ? "first" : "second"} player:
+        </legend>
+        {getAllDominoes().map((piece) => {
+          const pieceId = `${piece.left}-${piece.right}`;
+          const checked = initialGameInfo.hands[player].some((pieceOfHand) =>
+            comparePieces(piece, pieceOfHand),
+          );
+          const isTaken = initialGameInfo.hands[(player + 1) % 2].some(
+            (pieceOfHand) => comparePieces(piece, pieceOfHand),
+          );
+          return (
+            <div key={pieceId} className="relative w-max focus-within:outline">
+              <label htmlFor={pieceId}>
+                <DominoBlock
+                  piece={piece}
+                  orientation="horizontal"
+                  variant={
+                    isTaken ? "grayed-out" : checked ? "chosen" : "default"
+                  }
                 />
-              </div>
-            );
-          })}
-        </fieldset>
-        <div className="flex justify-between gap-[16px] px-[8px]">
-          <Button type="button" onClick={() => setPlayer((player + 1) % 2)}>
-            Switch player
-          </Button>
-          {initialGameInfo.hands[0].length + initialGameInfo.hands[1].length ===
-          28 ? (
-            <Button onClick={handleRemoveSelection} type="button">
-              Remove current player selection
-            </Button>
-          ) : (
-            <Button onClick={handleSelectAll} type="button">
-              Select the rest
-            </Button>
-          )}
-          <Button onClick={handleRemoveAllSelection}>
-            Remove all selection
-          </Button>
-          <Button>Initialize game</Button>
-        </div>
-      </form>
-    </>
+              </label>
+              <input
+                id={pieceId}
+                className="absolute inset-0 opacity-0"
+                type="checkbox"
+                value={`${piece.left}-${piece.right}`}
+                checked={checked}
+                onChange={(event) => handleCheck(event, piece)}
+              />
+            </div>
+          );
+        })}
+      </fieldset>
+      <div className="flex basis-[48px] justify-between gap-[16px] px-[32px]">
+        <Button type="button" onClick={handleRemoveAllSelection}>Remove all selection</Button>
+        <Button>Initialize game</Button>
+      </div>
+    </form>
   );
 }
 

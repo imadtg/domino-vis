@@ -2,7 +2,12 @@
 module.exports = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
-    extend: {},
+    extend: {
+      screens: {
+        'landscape': { 'raw': '(orientation: landscape)' },
+        'portrait': { 'raw': '(orientation: portrait)' },
+      }
+    }
   },
   plugins: [],
 };

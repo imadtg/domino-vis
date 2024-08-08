@@ -121,6 +121,11 @@ function DominoSvg({ topNumber, bottomNumber }: DominoSvgProps) {
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 100 200" // TODO: calculate this from the aspect ratio, or flip control and somehow give the parent information about this
       fill="none"
+      style={
+        {
+          "--applied-domino-body-color": "var(--domino-body-color, #D9D9D9)", // this is here for additional redunduncy, see DominoBlock
+        } as React.CSSProperties
+      }
     >
       <rect
         data-label="body"
@@ -129,7 +134,7 @@ function DominoSvg({ topNumber, bottomNumber }: DominoSvgProps) {
         width="100"
         height="200"
         rx="20"
-        fill="#D9D9D9"
+        className="fill-[--applied-domino-body-color]"
       />
       {(() => {
         // TODO: refactor this logic into CSS variables.
