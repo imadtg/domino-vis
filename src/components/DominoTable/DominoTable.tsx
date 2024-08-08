@@ -1,9 +1,7 @@
 "use client";
 import * as React from "react";
-import { produce } from "immer";
 
 import {
-  initialize,
   pass,
   playMove,
   selectHands,
@@ -15,14 +13,9 @@ import {
 
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import {
-  comparePieces,
-  DominoIngameInfo,
   DominoPiece,
-  Side,
-  getAllDominoes,
   getPlayableSides,
 } from "@/lib/features/domino/dominoUtils";
-import clsx from "clsx";
 
 import Snake from "@/src/components/Snake";
 import Hand from "@/src/components/Hand";

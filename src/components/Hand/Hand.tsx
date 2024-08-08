@@ -1,24 +1,8 @@
 "use client";
 import * as React from "react";
-import { produce } from "immer";
-
 import {
-  initialize,
-  playMove,
-  selectHand,
-  selectSnake,
-  selectStatus,
-  selectTurn,
-} from "@/lib/features/domino/dominoSlice";
-
-import { useAppDispatch, useAppSelector } from "@/lib/hooks";
-import {
-  comparePieces,
-  DominoIngameInfo,
   DominoPiece,
-  getAllDominoes,
 } from "@/lib/features/domino/dominoUtils";
-import clsx from "clsx";
 import DominoBlock from "../DominoBlock";
 import { ProcessedDominoPiece } from "../DominoTable";
 
