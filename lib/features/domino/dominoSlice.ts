@@ -19,7 +19,7 @@ interface UninitializedDominoGame {
   gameStatus: "uninitialized";
 }
 
-export type DominoGame = PlayingDominoGame | UninitializedDominoGame; // TODO: fix gameStatus being fixed to literal type "unintialized" in typescrip
+export type DominoGame = PlayingDominoGame | UninitializedDominoGame;
 
 const initialState: DominoGame = {
   gameStatus: "uninitialized",
@@ -122,9 +122,13 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
       state.gameStatus === "playing" ? state.gameInfo.snake : undefined,
     selectTurn: (state) =>
       state.gameStatus === "playing" ? state.gameInfo.turn : undefined,
-    selectStatus: (state) => state.gameStatus,
     selectIsBlocked: (state) =>
       state.gameStatus === "playing" ? state.passCounter >= 2 : undefined,
+    selectStatus: (state) => state.gameStatus,
+    selectGameInfo: (state) =>
+      state.gameStatus === "playing"
+        ? state.gameInfo
+        : undefined,
   },
 });
 
@@ -136,4 +140,5 @@ export const {
   selectTurn,
   selectStatus,
   selectIsBlocked,
+  selectGameInfo,
 } = dominoSlice.selectors;

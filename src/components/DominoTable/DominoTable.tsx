@@ -4,11 +4,8 @@ import * as React from "react";
 import {
   pass,
   playMove,
-  selectHands,
+  selectGameInfo,
   selectIsBlocked,
-  selectSnake,
-  selectStatus,
-  selectTurn,
 } from "@/lib/features/domino/dominoSlice";
 
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
@@ -28,27 +25,28 @@ export interface ProcessedDominoPiece {
 
 function DominoTable() {
   const dispatch = useAppDispatch();
-  const firstPlayer = 0;
-  const secondPlayer = 1;
-  const turn: number = useAppSelector(selectTurn);
-  const hands = useAppSelector(selectHands);
-  const snake = useAppSelector(selectSnake);
+  const gameInfo = useAppSelector(selectGameInfo);
   const isBlocked = useAppSelector(selectIsBlocked);
-  const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
-  const gameStatus = useAppSelector(selectStatus);
 
-  if (gameStatus === "uninitialized") {
-    // this is supposed to give typescript more type narrowing power, but the tagged union needs to be fixed first in dominoSlice.
+  if (typeof gameInfo === "undefined") {
     return;
   }
 
-  const processedHands: ProcessedDominoPiece[][] = hands?.map(
+  const turn = gameInfo.turn;
+  const hands = gameInfo.hands;
+  const snake = gameInfo.snake;
+  const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
+
+  const firstPlayer = 0;
+  const secondPlayer = 1;
+
+  const processedHands: ProcessedDominoPiece[][] = hands.map(
     (hand: DominoPiece[], player: number) =>
       hand.map((piece: DominoPiece) => {
         const sides = getPlayableSides(snake, piece);
         return {
           piece,
-          playable: sides?.length > 0 && turn === player,
+          playable: sides.length > 0 && turn === player,
         };
       }),
   );

@@ -1,5 +1,5 @@
 "use client";
-import DominoBlock from "@/src/components/DominoBlock";
+import DominoBlock, { Orientation } from "@/src/components/DominoBlock";
 import React from "react";
 import {
   comparePieces,
@@ -88,7 +88,8 @@ function PiecePlaygroundPage() {
 }
 
 function PlayfullDominoBlock({ piece }: { piece: DominoPiece }) {
-  const [orientation, setOrientation] = React.useState("horizontal");
+  const [orientation, setOrientation] =
+    React.useState<Orientation>("horizontal");
   const [swap, setSwap] = React.useState(false);
   function handleClick() {
     if (orientation == "horizontal") {
