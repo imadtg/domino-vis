@@ -1,7 +1,7 @@
 import type { Action, ThunkAction } from "@reduxjs/toolkit";
 import { combineSlices, configureStore } from "@reduxjs/toolkit";
 import { dominoSlice } from "./features/domino/dominoSlice";
-import dominoWasmMiddleware from "./features/domino/dominoWasmMiddleware";
+import listenerMiddleware from "./features/domino/dominoWasmMiddleware";
 
 const rootReducer = combineSlices(dominoSlice);
 
@@ -11,7 +11,7 @@ export const makeStore = () => {
   return configureStore({
     reducer: rootReducer,
     middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware().prepend(dominoWasmMiddleware.middleware),
+      getDefaultMiddleware().prepend(listenerMiddleware.middleware),
   });
 };
 

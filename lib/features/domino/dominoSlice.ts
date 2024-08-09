@@ -1,45 +1,58 @@
 import { createAppSlice } from "@/lib/createAppSlice";
 import type { AppThunk } from "@/lib/store";
-import type { PayloadAction } from "@reduxjs/toolkit";
+import type {
+  CreateSliceOptions,
+  PayloadAction,
+  SliceCaseReducers,
+  SliceSelectors,
+} from "@reduxjs/toolkit";
 import type { DominoPiece, Move, DominoIngameInfo } from "./dominoUtils";
 import { comparePieces, turnAround } from "./dominoUtils";
 
-type PlayingDominoGame = {
+interface PlayingDominoGame {
   gameStatus: "playing";
   gameInfo: DominoIngameInfo;
   passCounter: number;
-};
+}
 
-type UninitializedDominoGame = {
+interface UninitializedDominoGame {
   gameStatus: "uninitialized";
-};
+}
 
-export type DominoGameSliceState = PlayingDominoGame | UninitializedDominoGame; // TODO: fix gameStatus being fixed to literal type "unintialized" in typescrip
+export type DominoGame = PlayingDominoGame | UninitializedDominoGame; // TODO: fix gameStatus being fixed to literal type "unintialized" in typescrip
 
-const initialState: DominoGameSliceState = {
+const initialState: DominoGame = {
   gameStatus: "uninitialized",
 };
 
-function isUninitialized(
-  state: DominoGameSliceState,
-): state is UninitializedDominoGame {
+function isUninitialized(state: DominoGame): state is UninitializedDominoGame {
   return state.gameStatus === "uninitialized";
 }
 
-function isPlaying(state: DominoGameSliceState): state is PlayingDominoGame {
+function isPlaying(state: DominoGame): state is PlayingDominoGame {
   return state.gameStatus === "playing";
 }
 
-export const dominoSlice = createAppSlice({
+const partialGenericCreateAppSlice = <T>() => {
+  // this is absolute pain. this could break on RTK update, there has to be a better way...
+  return <
+    U extends SliceCaseReducers<T>,
+    V extends string,
+    W extends SliceSelectors<T>,
+  >(
+    config: CreateSliceOptions<T, U, V, V, W>,
+  ) => createAppSlice<T, U, V, W>(config);
+};
+
+export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
   name: "dominoGame",
   initialState,
   reducers: (create) => ({
     initialize: create.reducer(
-      /* @ts-ignore */
       (
-        state: DominoGameSliceState,
+        state: DominoGame,
         action: PayloadAction<DominoIngameInfo>,
-      ) => {
+      ): PlayingDominoGame | undefined => {
         if (isUninitialized(state)) {
           // Create and return a new state object with the "playing" status
           return {
@@ -54,7 +67,7 @@ export const dominoSlice = createAppSlice({
       },
     ),
     playMove: create.reducer(
-      (state: DominoGameSliceState, action: PayloadAction<Move>) => {
+      (state: DominoGame, action: PayloadAction<Move>) => {
         if (!isPlaying(state)) {
           // Handle the case when the game is not in the "playing" state.
           // For example, return the state unchanged or throw an error.
@@ -94,7 +107,7 @@ export const dominoSlice = createAppSlice({
         state.gameInfo.turn = (state.gameInfo.turn + 1) % 2;
       },
     ),
-    pass: create.reducer((state: DominoGameSliceState) => {
+    pass: create.reducer((state: DominoGame) => {
       if (state.gameStatus !== "playing") {
         return;
       }
@@ -103,19 +116,24 @@ export const dominoSlice = createAppSlice({
     }),
   }),
   selectors: {
-    selectHands: (state /* @ts-ignore */) =>
+    selectHands: (state) =>
       state.gameStatus === "playing" ? state.gameInfo.hands : undefined,
-    selectSnake: (state /* @ts-ignore */) =>
+    selectSnake: (state) =>
       state.gameStatus === "playing" ? state.gameInfo.snake : undefined,
-    selectTurn: (state /* @ts-ignore */) =>
+    selectTurn: (state) =>
       state.gameStatus === "playing" ? state.gameInfo.turn : undefined,
     selectStatus: (state) => state.gameStatus,
-    selectIsBlocked: (state /* @ts-ignore */) =>
+    selectIsBlocked: (state) =>
       state.gameStatus === "playing" ? state.passCounter >= 2 : undefined,
   },
 });
 
 export const { initialize, playMove, pass } = dominoSlice.actions;
 
-export const { selectHands, selectSnake, selectTurn, selectStatus, selectIsBlocked } =
-  dominoSlice.selectors;
+export const {
+  selectHands,
+  selectSnake,
+  selectTurn,
+  selectStatus,
+  selectIsBlocked,
+} = dominoSlice.selectors;

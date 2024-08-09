@@ -1,6 +1,15 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import DominoSvg from "./DominoSvg";
+import { Orientation } from "./DominoBlock";
+
+interface DominoIconProps {
+  left: number;
+  right: number;
+  orientation: Orientation;
+  aspectRatio: number;
+  dominoGroupId: string;
+}
 
 const DominoIcon = ({
   left,
@@ -8,8 +17,7 @@ const DominoIcon = ({
   orientation,
   aspectRatio,
   dominoGroupId,
-  ...delegated
-}: any) => {
+}: DominoIconProps) => {
   const isHorizontal = orientation === "horizontal";
   const [bigPip, smallPip] = left > right ? [left, right] : [right, left];
   const rotate = isHorizontal ? (bigPip === right ? 90 : -90) : 0;
@@ -17,7 +25,7 @@ const DominoIcon = ({
   return (
     <div className="pointer-events-none absolute inset-0 grid grid-cols-1 grid-rows-1 place-items-center">
       {/* this wrapper is needed to center the svg and span the margin box of the parent containing block */}
-      <motion.div // i would have used motion.svg directly, but svg isn't supported well
+      <motion.div // i would have used motion.svg directly, but it isn't supported by framer motion.
         initial={false}
         layout="preserve-aspect"
         layoutId={`${dominoGroupId}:${bigPip}-${smallPip}`}

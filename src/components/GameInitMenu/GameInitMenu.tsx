@@ -39,7 +39,6 @@ function GameInitMenu() {
         return;
       }
     }
-    /* @ts-ignore */
     dispatch(initialize(withSelectRest(initialGameInfo)));
   }
 
@@ -116,7 +115,7 @@ function GameInitMenu() {
                   piece={piece}
                   orientation="horizontal"
                   variant={
-                    isTaken ? "grayed-out" : checked ? "chosen" : "default"
+                    isTaken ? "greyed" : checked ? "chosen" : "default"
                   }
                 />
               </label>
