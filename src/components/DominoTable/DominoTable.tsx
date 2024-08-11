@@ -27,15 +27,13 @@ function DominoTable() {
   const dispatch = useAppDispatch();
   const gameInfo = useAppSelector(selectGameInfo);
   const isBlocked = useAppSelector(selectIsBlocked);
+  const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
 
   if (typeof gameInfo === "undefined") {
     return;
   }
 
-  const turn = gameInfo.turn;
-  const hands = gameInfo.hands;
-  const snake = gameInfo.snake;
-  const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
+  const { turn, hands, snake } = gameInfo;
 
   const firstPlayer = 0;
   const secondPlayer = 1;

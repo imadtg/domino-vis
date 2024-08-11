@@ -19,7 +19,7 @@ import DominoBlock from "../DominoBlock";
 import Button from "../Button";
 import clsx from "clsx";
 
-// this whole componenet would ideally be just a button and then, with iterative deepening, highlight a move in DominoTable.
+// this whole component would ideally be just a button and then, with iterative deepening, highlight a move in DominoTable.
 
 function getAiMove(Module: any, game: number, depth: number): Move {
   const { move } = newMovesContext(Module); // MEMORY LEAK!!!

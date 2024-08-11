@@ -1,8 +1,10 @@
 "use client";
 import * as React from "react";
-import DominoIcon from "./DominoIcon";
 import clsx from "clsx";
 import { DominoPiece } from "@/lib/features/domino/dominoUtils";
+import { motion } from "framer-motion";
+import DominoSvg from "./DominoSvg";
+
 const VARIANT_COLORS = {
   greyed: "#181717",
   highlighted: "#76d9eb",
@@ -10,65 +12,86 @@ const VARIANT_COLORS = {
   default: "#D9D9D9", // this is here for additional redunduncy, see DominoSvg
 };
 
+// the following are the fractions of width and height of a vertical domino (the default).
+const BASE_WIDTH_FR = 1;
+const BASE_HEIGHT_FR = 2;
+
+// this is proportional the base size of the domino block.
+const SIZE_SCALE = 6;
+
 type Variants = "greyed" | "highlighted" | "chosen" | "default";
 
-export type Orientation = "horizontal" | "vertical"
+export type Orientation = "horizontal" | "vertical";
 
-type DominoBlockProps<E extends React.ElementType> = Omit<React.ComponentProps<E>, 'as'> & {
+type DominoBlockProps<E extends React.ElementType> = Omit<
+  React.ComponentProps<E>,
+  "as"
+> & {
   piece: DominoPiece;
   as?: E;
   dominoGroupId?: string;
   variant?: Variants;
   orientation?: Orientation;
-}
+};
 
-function DominoBlock<E extends React.ElementType = 'div'>({
+function DominoBlock<E extends React.ElementType = "div">({
   piece,
   as,
   className = "",
   style = {},
   dominoGroupId = "global",
-  variant = "default" /* greyed-out | highlighted | chosen | default */,
+  variant = "default",
   orientation = "vertical",
   ...delegated
 }: DominoBlockProps<E>) {
   const isHorizontal = orientation === "horizontal";
-  const aspectRatio = isHorizontal ? 2 : 0.5;
-  const size = 6;
-  const widthFraction = isHorizontal ? 2 : 1; // TODO: calculate this and aspect ratio from eachother or another source, this feels redundant
-  
+  const [layoutWidthFr, layoutHeightFr] = isHorizontal
+    ? [BASE_HEIGHT_FR, BASE_WIDTH_FR]
+    : [BASE_WIDTH_FR, BASE_HEIGHT_FR];
+  const aspectRatio = layoutWidthFr / layoutHeightFr;
+
+  const [bigPip, smallPip] =
+    piece.left > piece.right
+      ? [piece.left, piece.right]
+      : [piece.right, piece.left];
+  const rotate = isHorizontal ? (bigPip === piece.right ? 90 : -90) : 0;
+
   const Tag = as || "div";
   return (
     <Tag
-      className={clsx("outline-offset-2", className)}
+      // i'm starting to miss styled-components...
+      className={clsx("relative outline-offset-2", className)}
       style={
         {
-          "--domino-size": size,
-          "--domino-width-scale": size * widthFraction,
+          "--domino-size": SIZE_SCALE,
+          "--domino-width-scale": SIZE_SCALE * layoutWidthFr,
           "--domino-body-color": VARIANT_COLORS[variant],
           ...style,
-          // i'm starting to miss styled-components...
-          width: `calc(clamp(6px , 1vw, 10px) * var(--domino-width-scale))`, // TODO: untangle unitless and unit mess
+          width: `calc(clamp(6px , 1vw, 10px) * var(--domino-width-scale))`, // TODO: untangle this mess...
+          aspectRatio,
         } as React.CSSProperties
       }
       {...delegated}
     >
-      <div // a hacky way to implement aspect ratios, this acts as the containing block for the icon and dynamically changes aspect ratio to respect layout.
-        style={{
-          // not using tailwind because we need interpolation and most of these properties serve the same purpose.
-          position: "relative",
-          boxSizing: "content-box",
-          height: 0,
-          paddingBottom: `${100 / aspectRatio}%`,
-        }}
-      >
-        <DominoIcon
-          left={piece.left}
-          right={piece.right}
-          dominoGroupId={dominoGroupId}
-          orientation={orientation}
-          aspectRatio={aspectRatio}
-        />
+      {/* center the icon within the tag and make it incosequential on layout.
+        we determined layout manually above, we apply transforms to fit the svg to the layout.
+      */}
+      <div className="pointer-events-none absolute inset-0 grid grid-cols-1 grid-rows-1 place-items-center">
+        <motion.div // i would have used motion.svg directly, but it isn't supported by framer motion.
+          initial={false}
+          layout="preserve-aspect"
+          layoutId={`${dominoGroupId}:${bigPip}-${smallPip}`}
+          animate={{
+            rotate,
+          }}
+          style={{
+            transform: `rotate(${rotate}deg)`,
+            transformOrigin: "center",
+            width: `${(BASE_WIDTH_FR / layoutWidthFr) * 100}%`,
+          }}
+        >
+          <DominoSvg topNumber={bigPip} bottomNumber={smallPip} />
+        </motion.div>
       </div>
     </Tag>
   );
