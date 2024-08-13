@@ -298,7 +298,7 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
           >
             <DominoBlock
               piece={
-                direction === "row"
+                direction === "row" || direction === "column
                   ? piece
                   : turnAround(piece)
               }
