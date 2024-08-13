@@ -33,12 +33,12 @@ startAppListening({
   actionCreator: initialize,
   effect: async (action: PayloadAction<DominoIngameInfo>, listenerApi) => {
     // Run whatever additional side-effect-y logic you want here
-    console.log("Wasm middleware listened for initialize: ", action.payload);
+    //console.log("Wasm middleware listened for initialize: ", action.payload);
     if (typeof ModuleState.Module === "undefined") {
       ModuleState.Module = await createConfiguredModule();
     }
     ModuleState.game = newGame(ModuleState.Module); // THIS IS A MEMORY LEAK!!!
-    console.log("ModuleState :", ModuleState);
+    //console.log("ModuleState :", ModuleState);
     action.payload.hands.map((hand, player) =>
       hand.map((piece) =>
         ModuleState.Module.ccall(
@@ -49,15 +49,15 @@ startAppListening({
         ),
       ),
     );
-    printGame(ModuleState.Module, ModuleState.game);
+    //printGame(ModuleState.Module, ModuleState.game);
   },
 });
 
 startAppListening({
   actionCreator: playMove,
   effect: async (action: PayloadAction<Move>, listenerApi) => {
-    console.log("Wasm middleware listened for playMove: ", action.payload);
-    console.log("ModuleState :", ModuleState);
+    //console.log("Wasm middleware listened for playMove: ", action.payload);
+    //console.log("ModuleState :", ModuleState);
     const { move } = newMovesContext(ModuleState.Module); // THIS IS A MEMORY LEAK!!!
     const { dominoGame } = listenerApi.getState();
     if (dominoGame.gameStatus !== "playing") {
@@ -92,16 +92,16 @@ startAppListening({
       ["number", "number"],
       [ModuleState.game, move],
     );
-    printGame(ModuleState.Module, ModuleState.game);
+    //printGame(ModuleState.Module, ModuleState.game);
   },
 });
 
 startAppListening({
   actionCreator: pass,
   effect: async (action, listenerApi) => {
-    console.log("Wasm middleware listened for pass: ", action.payload);
+    //console.log("Wasm middleware listened for pass: ", action.payload);
     wasmPass(ModuleState.Module, ModuleState.game);
-    printGame(ModuleState.Module, ModuleState.game);
+    //printGame(ModuleState.Module, ModuleState.game);
   },
 });
 

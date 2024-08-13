@@ -42,8 +42,8 @@ function GameInitMenu() {
     dispatch(initialize(withSelectRest(initialGameInfo)));
   }
 
-  function handleCheck(event: React.SyntheticEvent, piece: DominoPiece) {
-    if ((event.target as HTMLInputElement).checked) {
+  function handleCheck(event: React.FormEvent<HTMLInputElement>, piece: DominoPiece) {
+    if (event.currentTarget.checked) {
       if (
         initialGameInfo.hands[(player + 1) % 2].some((pieceOfHand) =>
           comparePieces(piece, pieceOfHand),
@@ -67,14 +67,6 @@ function GameInitMenu() {
         }, initialGameInfo),
       );
     }
-  }
-
-  function handleRemoveAllSelection() {
-    setInitialGameInfo(
-      produce((oldGameInfo) => {
-        oldGameInfo.hands = [[], []];
-      }, initialGameInfo),
-    );
   }
 
   function withSelectRest(gameInfo: DominoIngameInfo) {
@@ -131,9 +123,8 @@ function GameInitMenu() {
           );
         })}
       </fieldset>
-      <div className="flex basis-[48px] justify-between gap-[16px] px-[32px]">
-        <Button type="button" onClick={handleRemoveAllSelection}>Remove all selection</Button>
-        <Button>Initialize game</Button>
+      <div className="flex basis-[48px] justify-center px-[32px]">
+        <Button>Start game</Button>
       </div>
     </form>
   );
