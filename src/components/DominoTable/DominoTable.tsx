@@ -90,24 +90,8 @@ function DominoTable() {
           turn == firstPlayer ? (piece) => handleClickPiece(piece) : undefined
         }
       />
-      <div className="relative flex items-center">
-        {chosenPiece && (
-          <Button
-            className="absolute left-[-8px] -translate-x-full transform"
-            onClick={() => handlePlayChosenPiece("left")}
-          >
-            left
-          </Button>
-        )}
-        <Snake snake={snake} />
-        {chosenPiece && (
-          <Button
-            className="absolute right-[-8px] translate-x-full transform"
-            onClick={() => handlePlayChosenPiece("right")}
-          >
-            right
-          </Button>
-        )}
+      <div className="relative flex-1 w-screen px-16 outline outline-offset-4 outline-pink-400">
+        <Snake snake={snake} onSideClick={chosenPiece ? handlePlayChosenPiece : undefined} />
       </div>
       <Hand
         processedHand={processedHands[secondPlayer]}
