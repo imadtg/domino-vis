@@ -54,7 +54,7 @@ function DominoBlock<E extends React.ElementType = "div">({
     piece.left > piece.right
       ? [piece.left, piece.right]
       : [piece.right, piece.left];
-  const rotate = isHorizontal ? (bigPip === piece.right ? 90 : 270) : (bigPip === piece.right ? 0 : 180);
+  const rotate = isHorizontal ? (bigPip === piece.right ? 90 : 270) : (bigPip === piece.right ? 180 : 0);
 
   const Tag = as || "div";
   return (
