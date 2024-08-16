@@ -16,7 +16,7 @@ import {
 
 import Snake from "@/src/components/Snake";
 import Hand from "@/src/components/Hand";
-import Button from "../Button";
+import { startAppListening } from "@/lib/listenerMiddleware";
 
 export interface ProcessedDominoPiece {
   piece: DominoPiece;
@@ -48,13 +48,11 @@ function DominoTable() {
         };
       }),
   );
-
   React.useEffect(() => {
     if (!processedHands[turn].some(({ playable }) => playable) && !isBlocked) {
-      console.log("passing...");
       dispatch(pass());
     }
-  });
+  }, [processedHands, turn, isBlocked]);
 
   function handlePlayChosenPiece(side: "left" | "right") {
     if (!chosenPiece) {

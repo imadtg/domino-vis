@@ -1,11 +1,8 @@
 import {
-  createListenerMiddleware,
-  addListener,
-  PayloadAction,
-} from "@reduxjs/toolkit";
-import type { RootState, AppDispatch } from "../../store";
-
-import { initialize, playMove, pass } from "./dominoSlice";
+  initialize,
+  playMove,
+  pass,
+} from "../../../lib/features/domino/dominoSlice";
 import {
   createConfiguredModule,
   newGame,
@@ -13,22 +10,16 @@ import {
   newMovesContext,
   pass as wasmPass,
 } from "@/public/wasm/cToJShelpers";
-import { DominoIngameInfo, Move, turnAround } from "./dominoUtils";
-
-// Create the middleware instance and methods
-const listenerMiddleware = createListenerMiddleware();
-
-export const addAppListener = addListener.withTypes<RootState, AppDispatch>();
-
-export const startAppListening = listenerMiddleware.startListening.withTypes<
-  RootState,
-  AppDispatch
->();
+import {
+  DominoIngameInfo,
+  Move,
+  turnAround,
+} from "../../../lib/features/domino/dominoUtils";
+import { startAppListening } from "../../../lib/listenerMiddleware";
+import { PayloadAction } from "@reduxjs/toolkit";
 
 export let ModuleState: { Module?: any; game?: number } = {};
 
-// Add one or more listener entries that look for specific actions.
-// They may contain any sync or async logic, similar to thunks.
 startAppListening({
   actionCreator: initialize,
   effect: async (action: PayloadAction<DominoIngameInfo>, listenerApi) => {
@@ -104,5 +95,3 @@ startAppListening({
     //printGame(ModuleState.Module, ModuleState.game);
   },
 });
-
-export default listenerMiddleware;
