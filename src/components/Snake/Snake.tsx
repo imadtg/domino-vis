@@ -6,9 +6,12 @@ import {
   DominoPiece,
   Side,
 } from "@/lib/features/domino/dominoUtils";
-import DominoBlock from "../DominoBlock";
-import detectElementOverflow from "detect-element-overflow";
-import Button from "../Button";
+import DominoBlock, { Orientation, Variant } from "../DominoBlock";
+import {
+  detectElementOverflow,
+  getRect,
+  detectMaximumGap,
+} from "./Snake.helpers";
 import { css, styled } from "styled-components";
 
 type Direction = "row" | "column" | "row-reverse" | "column-reverse";
@@ -25,10 +28,11 @@ const FLEX_DIRECTIONS: Direction[] = [
 interface SnakeProps {
   snake: DominoPiece[];
   onSideClick?: (side: Side) => void;
-  debug?: boolean;
+  debug?: boolean; // this is for snake-playground. lets the user create arbitrary breakpoints instead of creating them based on layout.
 }
 
 function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
+  //console.log("render of snake started...");
   // all of the logic here assumes pieces are added incrementally...
   const firstPieceRef = React.useRef<DominoPiece>();
 
@@ -42,8 +46,8 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
     [],
   );
 
-  const leftSegmentRef = React.useRef<HTMLDivElement>();
-  const rightSegmentRef = React.useRef<HTMLDivElement>();
+  const segmentRefs = React.useRef<HTMLDivElement[]>([]);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   const originPieceIndex = snake.findIndex((piece) =>
     firstPieceRef.current ? comparePieces(firstPieceRef.current, piece) : false,
@@ -119,63 +123,153 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
           ],
   }));
 
-  // TODO: fix framer motion animation skipping rotation after the effect below runs.
+  function segmentsIntersect(
+    growingSegmentRef: HTMLElement,
+    staticSegmentRef: HTMLElement,
+    growingDirection: Direction,
+    minDistance: number,
+  ): boolean {
+    const gapInfo = detectMaximumGap(growingSegmentRef, staticSegmentRef);
+    const CALC_PERPENDICULAR_GAP: Record<Direction, () => number> = {
+      row: () => gapInfo.columnGap,
+      "row-reverse": () => gapInfo.columnGap,
+      column: () => gapInfo.rowGap,
+      "column-reverse": () => gapInfo.rowGap,
+    };
+    if (CALC_PERPENDICULAR_GAP[growingDirection]() > minDistance / 2) {
+      return false;
+    }
+    const CALC_GROWING_GAP: Record<Direction, () => number> = {
+      row: () => gapInfo.rowGap,
+      "row-reverse": () => gapInfo.rowGap,
+      column: () => gapInfo.columnGap,
+      "column-reverse": () => gapInfo.columnGap,
+    };
+    return CALC_GROWING_GAP[growingDirection]() < minDistance;
+  }
+
+  function shouldSegment(segmentIndex: number): boolean {
+    if (
+      !segmentRefs.current[segmentIndex] ||
+      !containerRef.current ||
+      typeof originSegmentIndex === "undefined"
+    ) {
+      console.log("something is terribly wrong");
+      console.log({segmentRefs: segmentRefs.current, containerRef: containerRef.current, originSegmentIndex})
+      return false;
+    }
+    const { direction } = directedSegments[segmentIndex];
+
+    const overflowInfo = detectElementOverflow(
+      segmentRefs.current[segmentIndex],
+      containerRef.current,
+    );
+    // NOTE: while this does detect overflow, it doesn't take into account if future doubles played on this segment would overflow
+    // this can be trivially mitigated by artificial padding on the wrapper that will contain the container of the snake.
+    const TEST_AGAINST_CONTAINER_LEFT: Record<Direction, () => boolean> = {
+      row: () => overflowInfo.collidedLeft,
+      "row-reverse": () => overflowInfo.collidedRight,
+      column: () => overflowInfo.collidedTop,
+      "column-reverse": () => overflowInfo.collidedBottom,
+    };
+    const TEST_AGAINST_CONTAINER_RIGHT: Record<Direction, () => boolean> = {
+      row: () => overflowInfo.collidedRight,
+      "row-reverse": () => overflowInfo.collidedLeft,
+      column: () => overflowInfo.collidedBottom,
+      "column-reverse": () => overflowInfo.collidedTop,
+    };
+    //console.log("Are we overflowing right?")
+    if (segmentIndex >= originSegmentIndex && TEST_AGAINST_CONTAINER_RIGHT[direction]()) {
+      return true;
+    }
+    //console.log("No...")
+    //console.log("Are we overflowing left?")
+    if (segmentIndex <= originSegmentIndex && TEST_AGAINST_CONTAINER_LEFT[direction]()) {
+      return true;
+    }
+    //console.log("No...")
+    const TEST_AGAINST_SEGMENTS_WITH_DIRECTION: Record<Direction, Direction[]> =
+      {
+        row: ["column", "column-reverse"],
+        "row-reverse": ["column", "column-reverse"],
+        column: ["row", "row-reverse"],
+        "column-reverse": ["row", "row-reverse"],
+      };
+    const GET_MIN_DISTANCE: Record<
+      Direction,
+      (segmentRef: HTMLElement) => number
+    > = {
+      row: (segmentRef) => getRect(segmentRef).height / 2,
+      "row-reverse": (segmentRef) => getRect(segmentRef).height / 2,
+      column: (segmentRef) => getRect(segmentRef).width / 2,
+      "column-reverse": (segmentRef) => getRect(segmentRef).width / 2,
+    };
+    return (
+      directedSegments.some(
+        ({ direction: againstSegmentDirection }, againstIndex) => {
+          if (
+            !TEST_AGAINST_SEGMENTS_WITH_DIRECTION[direction].includes(
+              againstSegmentDirection,
+            ) ||
+            !segmentRefs.current[againstIndex] ||
+            againstIndex === segmentIndex ||
+            (againstIndex === segmentIndex + 1) || // skip detection on adjacent segments.
+            (againstIndex === segmentIndex - 1)
+          ) {
+            return false;
+          }
+          /*let minDistance = 0;
+          if (againstIndex != originSegmentIndex) {
+            minDistance = GET_MIN_DISTANCE[againstSegmentDirection](
+              segmentRefs.current[againstIndex],
+            );
+          }*/
+          // temporarily going with safe distances, because the segments can sometimes overshoot the origin segment and cause trouble.
+          const minDistance = GET_MIN_DISTANCE[againstSegmentDirection](
+            segmentRefs.current[againstIndex],
+          );
+          //console.log("checking segment %d against %d", segmentIndex, againstIndex)
+          return segmentsIntersect(
+            segmentRefs.current[segmentIndex],
+            segmentRefs.current[againstIndex],
+            direction,
+            minDistance,
+          );
+        },
+      )
+    );
+  }
+
+  // TODO: fix framer motion rotation animation of DominoBlock breaking after the effect below triggers a rerender.
+  // perhaps we can use skeleton pieces until this effect finishes then use correct pieces?
   React.useLayoutEffect(() => {
     if (debug) {
       return;
     }
-    if (!leftSegmentRef.current || !leftSegmentRef.current.parentElement) {
+    //console.log("checking if should segment on the left...");
+    if (shouldSegment(0)) {
+      // leftmost segment
+      //console.log("yes! checking if can segment on the left...");
+      const segmentAtPiece = segments.at(0)?.at(1); // set a new breakpoint at the piece right after the leftmost piece.
+      if (!segmentAtPiece || pieceIsBreakpoint(segmentAtPiece)) {
+        // TODO: if segmenting is not possible, attempt sliding the entire snake at the opposite direction.
+        return;
+      }
+      //console.log("yes! segmenting on the left...");
+      setBreakpoint(segmentAtPiece);
       return;
     }
-    const leftOverflowInfo = detectElementOverflow(
-      leftSegmentRef.current,
-      leftSegmentRef.current.parentElement,
-    );
-    console.log({
-      leftOverflowInfo,
-      segments,
-      leftSegmentElement: leftSegmentRef.current,
-    });
-    if (
-      leftOverflowInfo.collidedLeft ||
-      leftOverflowInfo.collidedRight ||
-      leftOverflowInfo.collidedTop ||
-      leftOverflowInfo.collidedBottom
-    ) {
-      console.log("segmenting on the left");
-      setSegmentBreakpoints([
-        relativeIndex(segments[0][0]) + 1, // set a new breakpoint at the index after the leftmost piece.
-        ...segmentBreakpoints,
-      ]);
-    }
-    if (
-      !rightSegmentRef.current ||
-      !rightSegmentRef.current.parentElement ||
-      rightSegmentRef.current === leftSegmentRef.current
-    ) {
+    //console.log("checking if should segment on the right...");
+    if (shouldSegment(segments.length - 1)) {
+      // rightmost segment
+      //console.log("yes! checking if can segment on the right...");
+      const segmentAtPiece = segments.at(-1)?.at(-1); // set a new breakpoint at the rightmost piece.
+      if (!segmentAtPiece || pieceIsBreakpoint(segmentAtPiece)) {
+        return;
+      }
+      //console.log("yes! segmenting on the right...");
+      setBreakpoint(segmentAtPiece);
       return;
-    }
-    const rightOverflowInfo = detectElementOverflow(
-      rightSegmentRef.current,
-      rightSegmentRef.current.parentElement,
-    );
-    console.log({
-      rightOverflowInfo,
-      segments,
-      rightSegmentElement: rightSegmentRef.current,
-    });
-    if (
-      rightOverflowInfo.collidedLeft ||
-      rightOverflowInfo.collidedRight ||
-      rightOverflowInfo.collidedTop ||
-      rightOverflowInfo.collidedBottom
-    ) {
-      console.log("segmenting on the right");
-      setSegmentBreakpoints([
-        ...segmentBreakpoints,
-        // i have to figure out how to narrow this type without assertions
-        relativeIndex((segments.at(-1) as DominoPiece[]).at(-1) as DominoPiece), // set a new breakpoint at the index of the rightmost piece. so the rightmost piece will be in a new segment.
-      ]);
     }
   });
 
@@ -203,40 +297,39 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
     .map((segmentInfo, index) => ({ ...segmentInfo, index }))
     .slice(originSegmentIndex); // this does include the starting segment
 
+  const orderedDirectedSegments = [
+    ...rightDirectedSegments,
+    ...leftDirectedSegments,
+  ];
+
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-4 outline-dashed outline-red-600">
-      {[...rightDirectedSegments, ...leftDirectedSegments].map(
-        ({ segment, direction, index }) => (
-          <SnakeSegment
-            key={index - originSegmentIndex}
-            index={index - originSegmentIndex}
-            ref={(element: HTMLDivElement) => {
-              if (index === 0) {
-                leftSegmentRef.current = element;
-              }
-              if (index === segments.length - 1) {
-                rightSegmentRef.current = element;
-              }
-            }}
-            segment={segment}
-            direction={direction}
-            onLeftSideClick={
-              index === 0 && onSideClick ? () => onSideClick("left") : undefined
-            }
-            onRightSideClick={
-              index === segments.length - 1 && onSideClick
-                ? () => onSideClick("right")
-                : undefined
-            }
-            debug={debug}
-            onPieceClick={
-              debug ? (piece) => toggleBreakpoint(piece) : undefined
-            }
-            highlightPiece={debug ? pieceIsBreakpoint : undefined}
-            isAnchoredOnDouble={segmentIsAnchoredOnDouble(index)}
-          />
-        ),
-      )}
+    <div
+      className="flex h-full w-full flex-col items-center justify-center gap-4 outline-dashed outline-red-600"
+      ref={containerRef}
+    >
+      {orderedDirectedSegments.map(({ segment, direction, index }) => (
+        <SnakeSegment
+          key={index - originSegmentIndex}
+          index={index - originSegmentIndex}
+          ref={(element: HTMLDivElement) => {
+            segmentRefs.current[index] = element;
+          }}
+          segment={segment}
+          direction={direction}
+          onLeftSideClick={
+            index === 0 && onSideClick ? () => onSideClick("left") : undefined
+          }
+          onRightSideClick={
+            index === segments.length - 1 && onSideClick
+              ? () => onSideClick("right")
+              : undefined
+          }
+          debug={debug}
+          onPieceClick={debug ? (piece) => toggleBreakpoint(piece) : undefined}
+          highlightPiece={debug ? pieceIsBreakpoint : undefined}
+          isAnchoredOnDouble={segmentIsAnchoredOnDouble(index)}
+        />
+      ))}
     </div>
   );
 }
@@ -253,6 +346,7 @@ interface SnakeSegmentProps {
   isAnchoredOnDouble?: boolean;
 }
 
+// TODO: unhardcode ref type being on a <div/>.
 const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
   (
     {
@@ -264,9 +358,17 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
       onPieceClick,
       highlightPiece,
       isAnchoredOnDouble = false,
+      debug,
     }: SnakeSegmentProps,
     ref,
   ) => {
+    function flipOrientation(orientation: Orientation): Orientation {
+      if (orientation === "horizontal") {
+        return "vertical";
+      }
+      return "horizontal";
+    }
+
     return (
       <SegmentWrapper
         $index={index}
@@ -275,57 +377,71 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
         className="absolute flex items-center gap-[--spacing]"
         ref={ref}
       >
-        {onLeftSideClick && (
-          <Button
-            className="absolute -left-2 -translate-x-full transform"
-            onClick={onLeftSideClick}
-          >
-            left
-          </Button>
-        )}
-        {segment.map((piece, pieceIndex) => (
-          <DominoBlockWrapper
-            $anchorName={
-              segment.length === 1
-                ? `--left-${index}, --right-${index}`
-                : pieceIndex === 0
-                  ? `--left-${index}`
-                  : pieceIndex === segment.length - 1
-                    ? `--right-${index}`
-                    : undefined
+        {segment.map((piece, pieceIndex) => {
+          const isLeftmostPiece = pieceIndex === 0;
+          const isRightmostPiece = pieceIndex === segment.length - 1;
+
+          let anchorName;
+          if (segment.length === 1) {
+            anchorName = `--left-${index}, --right-${index}`;
+          } else if (isLeftmostPiece) {
+            anchorName = `--left-${index}`;
+          } else if (isRightmostPiece) {
+            anchorName = `--right-${index}`;
+          }
+
+          let orientation: Orientation =
+            direction === "row" || direction === "row-reverse"
+              ? "horizontal"
+              : "vertical";
+          if (piece.left === piece.right) {
+            orientation = flipOrientation(orientation);
+          }
+
+          let interactive = false;
+          let onClick;
+          let variant: Variant = "default";
+          if (debug) {
+            if (onPieceClick) {
+              interactive = true;
+              onClick = () => onPieceClick(piece);
             }
-            key={`${piece.left}-${piece.right}`}
-          >
-            <DominoBlock
-              piece={
-                direction === "row" || direction === "column"
-                  ? piece
-                  : turnAround(piece)
-              }
-              orientation={
-                direction === "row" || direction === "row-reverse"
-                  ? piece.left !== piece.right
-                    ? "horizontal"
-                    : "vertical"
-                  : piece.left !== piece.right
-                    ? "vertical"
-                    : "horizontal"
-              }
-              className="block"
-              as={onPieceClick ? "button" : "div"}
-              onClick={onPieceClick ? () => onPieceClick(piece) : undefined}
-              variant={highlightPiece?.(piece) ? "highlighted" : "default"}
-            />
-          </DominoBlockWrapper>
-        ))}
-        {onRightSideClick && (
-          <Button
-            className="absolute -right-2 translate-x-full transform"
-            onClick={onRightSideClick}
-          >
-            right
-          </Button>
-        )}
+            if (highlightPiece?.(piece)) {
+              variant = "highlighted";
+            }
+          } else {
+            // TODO: give player a choice on which side to play on when playing on top of the first double.
+            if (onLeftSideClick && isLeftmostPiece) {
+              interactive = true;
+              variant = "highlighted";
+              onClick = onLeftSideClick;
+            } else if (onRightSideClick && isRightmostPiece) {
+              interactive = true;
+              variant = "highlighted";
+              onClick = onRightSideClick;
+            }
+          }
+
+          return (
+            <DominoBlockWrapper
+              $anchorName={anchorName}
+              key={`${piece.left}-${piece.right}`}
+            >
+              <DominoBlock
+                piece={
+                  direction === "row" || direction === "column"
+                    ? piece
+                    : turnAround(piece) // turn the piece around as the flow is reversed.
+                }
+                orientation={orientation}
+                className="block"
+                as={interactive ? "button" : "div"}
+                onClick={onClick}
+                variant={variant}
+              />
+            </DominoBlockWrapper>
+          );
+        })}
       </SegmentWrapper>
     );
   },

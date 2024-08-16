@@ -49,9 +49,12 @@ function DominoTable() {
       }),
   );
 
-  if (!processedHands[turn].some(({ playable }) => playable) && !isBlocked) {
-    dispatch(pass());
-  }
+  React.useEffect(() => {
+    if (!processedHands[turn].some(({ playable }) => playable) && !isBlocked) {
+      console.log("passing...");
+      dispatch(pass());
+    }
+  });
 
   function handlePlayChosenPiece(side: "left" | "right") {
     if (!chosenPiece) {
@@ -90,8 +93,11 @@ function DominoTable() {
           turn == firstPlayer ? (piece) => handleClickPiece(piece) : undefined
         }
       />
-      <div className="relative flex-1 w-screen px-16 outline outline-offset-4 outline-pink-400">
-        <Snake snake={snake} onSideClick={chosenPiece ? handlePlayChosenPiece : undefined} />
+      <div className="relative w-screen flex-1 px-16 outline outline-offset-4 outline-pink-400">
+        <Snake
+          snake={snake}
+          onSideClick={chosenPiece ? handlePlayChosenPiece : undefined}
+        />
       </div>
       <Hand
         processedHand={processedHands[secondPlayer]}
