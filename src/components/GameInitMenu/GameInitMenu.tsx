@@ -42,7 +42,10 @@ function GameInitMenu() {
     dispatch(initialize(withSelectRest(initialGameInfo)));
   }
 
-  function handleCheck(event: React.FormEvent<HTMLInputElement>, piece: DominoPiece) {
+  function handleCheck(
+    event: React.FormEvent<HTMLInputElement>,
+    piece: DominoPiece,
+  ) {
     if (event.currentTarget.checked) {
       if (
         initialGameInfo.hands[(player + 1) % 2].some((pieceOfHand) =>
@@ -101,19 +104,20 @@ function GameInitMenu() {
             (pieceOfHand) => comparePieces(piece, pieceOfHand),
           );
           return (
-            <div key={pieceId} className="relative w-max focus-within:outline">
-              <label htmlFor={pieceId}>
+            <div
+              key={pieceId}
+              className="relative w-min focus-within:outline" // TODO: fix the tiny gaps between this wrapper and the DominoBlock
+            >
+              <label className="block" htmlFor={pieceId}>
                 <DominoBlock
                   piece={piece}
                   orientation="horizontal"
-                  variant={
-                    isTaken ? "greyed" : checked ? "chosen" : "default"
-                  }
+                  variant={isTaken ? "greyed" : checked ? "chosen" : "default"}
                 />
               </label>
               <input
                 id={pieceId}
-                className="absolute inset-0 opacity-0"
+                className="block absolute inset-0 opacity-0"
                 type="checkbox"
                 value={`${piece.left}-${piece.right}`}
                 checked={checked}

@@ -7,6 +7,7 @@ import {
   turnAround,
 } from "@/lib/features/domino/dominoUtils";
 import Button from "@/src/components/Button";
+import { LayoutGroup } from "framer-motion";
 
 function PiecePlaygroundPage() {
   const [pieces, setPieces] = React.useState<DominoPiece[]>([]);
@@ -87,7 +88,11 @@ function PiecePlaygroundPage() {
   );
 }
 
-function PlayfullDominoBlock({ piece }: { piece: DominoPiece }) {
+interface PlayfullDominoBlockProps {
+  piece: DominoPiece;
+}
+
+function PlayfullDominoBlock({ piece }: PlayfullDominoBlockProps) {
   const [orientation, setOrientation] =
     React.useState<Orientation>("horizontal");
   const [swap, setSwap] = React.useState(false);
