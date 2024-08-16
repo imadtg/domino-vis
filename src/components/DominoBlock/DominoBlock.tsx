@@ -70,7 +70,7 @@ function DominoBlock<E extends React.ElementType = "div">({
           "--domino-width-scale": SIZE_SCALE * layoutWidthFr,
           "--domino-body-color": VARIANT_COLORS[variant],
           ...style,
-          width: `calc(clamp(6px , 1vw, 8px) * var(--domino-width-scale))`, // TODO: untangle this mess...
+          width: `calc(clamp(4px , 1vw, 8px) * var(--domino-width-scale))`, // TODO: untangle this mess...
           aspectRatio,
         } as React.CSSProperties
       }

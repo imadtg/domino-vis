@@ -252,6 +252,7 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
       //console.log("yes! checking if can segment on the left...");
       const segmentAtPiece = segments.at(0)?.at(1); // set a new breakpoint at the piece right after the leftmost piece.
       if (!segmentAtPiece || pieceIsBreakpoint(segmentAtPiece)) {
+        // TODO: if segmenting is not possible, attempt sliding the entire snake at the opposite direction.
         return;
       }
       //console.log("yes! segmenting on the left...");
