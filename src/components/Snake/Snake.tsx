@@ -368,7 +368,6 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
       >
         push right
       </Button>
-      gfdgfdgfd
     </div>
   );
 }
