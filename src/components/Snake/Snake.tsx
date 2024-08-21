@@ -498,12 +498,6 @@ interface SegmentWrapperProps {
 }
 
 const SegmentWrapper = styled.div<SegmentWrapperProps>`
-  ${(props) =>
-    props.$isAnchoredOnDouble
-      ? css`
-          background-color: hotpink;
-        `
-      : css``}
   --spacing: 2px;
   @media (min-width: 640px) {
     --spacing: 4px;
