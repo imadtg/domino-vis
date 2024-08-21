@@ -13,6 +13,7 @@ import {
   detectMaximumGap,
 } from "./Snake.helpers";
 import { css, styled } from "styled-components";
+import Button from "../Button";
 
 type Direction = "row" | "column" | "row-reverse" | "column-reverse";
 
@@ -34,11 +35,13 @@ interface SnakeProps {
 function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
   //console.log("render of snake started...");
   // all of the logic here assumes pieces are added incrementally...
-  const firstPieceRef = React.useRef<DominoPiece>();
+  const [firstPiece, setFirstPiece] = React.useState<DominoPiece>();
 
-  if (!firstPieceRef.current && snake.length > 0) {
-    firstPieceRef.current = snake[0];
-  }
+  React.useEffect(() => {
+    if (!firstPiece && snake.length > 0) {
+      setFirstPiece(snake[0]);
+    }
+  }, [firstPiece, snake]);
 
   // relative indices of pieces to know how to break the snake into segments at those indices.
   // priority of break is always to the right, ie breaking at [0|0] gives it to the right segment.
@@ -50,7 +53,7 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const originPieceIndex = snake.findIndex((piece) =>
-    firstPieceRef.current ? comparePieces(firstPieceRef.current, piece) : false,
+    firstPiece ? comparePieces(firstPiece, piece) : false,
   );
 
   function relativeIndex(relativePiece: DominoPiece) {
@@ -155,7 +158,11 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
       typeof originSegmentIndex === "undefined"
     ) {
       console.log("something is terribly wrong");
-      console.log({segmentRefs: segmentRefs.current, containerRef: containerRef.current, originSegmentIndex})
+      console.log({
+        segmentRefs: segmentRefs.current,
+        containerRef: containerRef.current,
+        originSegmentIndex,
+      });
       return false;
     }
     const { direction } = directedSegments[segmentIndex];
@@ -179,12 +186,18 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
       "column-reverse": () => overflowInfo.collidedTop,
     };
     //console.log("Are we overflowing right?")
-    if (segmentIndex >= originSegmentIndex && TEST_AGAINST_CONTAINER_RIGHT[direction]()) {
+    if (
+      segmentIndex >= originSegmentIndex &&
+      TEST_AGAINST_CONTAINER_RIGHT[direction]()
+    ) {
       return true;
     }
     //console.log("No...")
     //console.log("Are we overflowing left?")
-    if (segmentIndex <= originSegmentIndex && TEST_AGAINST_CONTAINER_LEFT[direction]()) {
+    if (
+      segmentIndex <= originSegmentIndex &&
+      TEST_AGAINST_CONTAINER_LEFT[direction]()
+    ) {
       return true;
     }
     //console.log("No...")
@@ -204,40 +217,52 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
       column: (segmentRef) => getRect(segmentRef).width / 2,
       "column-reverse": (segmentRef) => getRect(segmentRef).width / 2,
     };
-    return (
-      directedSegments.some(
-        ({ direction: againstSegmentDirection }, againstIndex) => {
-          if (
-            !TEST_AGAINST_SEGMENTS_WITH_DIRECTION[direction].includes(
-              againstSegmentDirection,
-            ) ||
-            !segmentRefs.current[againstIndex] ||
-            againstIndex === segmentIndex ||
-            (againstIndex === segmentIndex + 1) || // skip detection on adjacent segments.
-            (againstIndex === segmentIndex - 1)
-          ) {
-            return false;
-          }
-          /*let minDistance = 0;
+    return directedSegments.some(
+      ({ direction: againstSegmentDirection }, againstIndex) => {
+        if (
+          !TEST_AGAINST_SEGMENTS_WITH_DIRECTION[direction].includes(
+            againstSegmentDirection,
+          ) ||
+          !segmentRefs.current[againstIndex] ||
+          againstIndex === segmentIndex ||
+          againstIndex === segmentIndex + 1 || // skip detection on adjacent segments.
+          againstIndex === segmentIndex - 1
+        ) {
+          return false;
+        }
+        /*let minDistance = 0;
           if (againstIndex != originSegmentIndex) {
             minDistance = GET_MIN_DISTANCE[againstSegmentDirection](
               segmentRefs.current[againstIndex],
             );
           }*/
-          // temporarily going with safe distances, because the segments can sometimes overshoot the origin segment and cause trouble.
-          const minDistance = GET_MIN_DISTANCE[againstSegmentDirection](
-            segmentRefs.current[againstIndex],
-          );
-          //console.log("checking segment %d against %d", segmentIndex, againstIndex)
-          return segmentsIntersect(
-            segmentRefs.current[segmentIndex],
-            segmentRefs.current[againstIndex],
-            direction,
-            minDistance,
-          );
-        },
-      )
+        // temporarily going with safe distances, because the segments can sometimes overshoot the origin segment and cause trouble.
+        const minDistance = GET_MIN_DISTANCE[againstSegmentDirection](
+          segmentRefs.current[againstIndex],
+        );
+        //console.log("checking segment %d against %d", segmentIndex, againstIndex)
+        return segmentsIntersect(
+          segmentRefs.current[segmentIndex],
+          segmentRefs.current[againstIndex],
+          direction,
+          minDistance,
+        );
+      },
     );
+  }
+
+  function pushSnakeRight() {
+    if (originPieceIndex === 0) {
+      return;
+    }
+    setFirstPiece(snake[originPieceIndex - 1]);
+  }
+
+  function pushSnakeLeft() {
+    if (originPieceIndex === snake.length - 1) {
+      return;
+    }
+    setFirstPiece(snake[originPieceIndex + 1]);
   }
 
   // TODO: fix framer motion rotation animation of DominoBlock breaking after the effect below triggers a rerender.
@@ -252,7 +277,7 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
       //console.log("yes! checking if can segment on the left...");
       const segmentAtPiece = segments.at(0)?.at(1); // set a new breakpoint at the piece right after the leftmost piece.
       if (!segmentAtPiece || pieceIsBreakpoint(segmentAtPiece)) {
-        // TODO: if segmenting is not possible, attempt sliding the entire snake at the opposite direction.
+        pushSnakeRight();
         return;
       }
       //console.log("yes! segmenting on the left...");
@@ -265,6 +290,7 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
       //console.log("yes! checking if can segment on the right...");
       const segmentAtPiece = segments.at(-1)?.at(-1); // set a new breakpoint at the rightmost piece.
       if (!segmentAtPiece || pieceIsBreakpoint(segmentAtPiece)) {
+        pushSnakeLeft();
         return;
       }
       //console.log("yes! segmenting on the right...");
@@ -330,6 +356,18 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
           isAnchoredOnDouble={segmentIsAnchoredOnDouble(index)}
         />
       ))}
+      <Button
+        className="fixed bottom-0 left-0 top-0 my-auto h-fit"
+        onClick={pushSnakeLeft}
+      >
+        push left
+      </Button>
+      <Button
+        className="fixed bottom-0 right-0 top-0 my-auto h-fit"
+        onClick={pushSnakeRight}
+      >
+        push right
+      </Button>
     </div>
   );
 }
@@ -460,12 +498,6 @@ interface SegmentWrapperProps {
 }
 
 const SegmentWrapper = styled.div<SegmentWrapperProps>`
-  ${(props) =>
-    props.$isAnchoredOnDouble
-      ? css`
-          background-color: hotpink;
-        `
-      : css``}
   --spacing: 2px;
   @media (min-width: 640px) {
     --spacing: 4px;

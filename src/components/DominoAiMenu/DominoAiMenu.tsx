@@ -5,7 +5,7 @@ import { playMove } from "@/lib/features/domino/dominoSlice";
 
 import { useAppDispatch } from "@/lib/hooks";
 
-import { ModuleState } from "@/lib/features/domino/dominoWasmMiddleware";
+import { ModuleState } from "@/src/components/DominoAiMenu/dominoWasmStore";
 
 import {
   extractLeft,
