@@ -16,7 +16,6 @@ import {
 
 import Snake from "@/src/components/Snake";
 import Hand from "@/src/components/Hand";
-import { startAppListening } from "@/lib/listenerMiddleware";
 
 export interface ProcessedDominoPiece {
   piece: DominoPiece;
@@ -26,6 +25,7 @@ export interface ProcessedDominoPiece {
 function DominoTable() {
   const dispatch = useAppDispatch();
   const gameInfo = useAppSelector(selectGameInfo);
+  // TODO: add passing UI and endgame UI
   const isBlocked = useAppSelector(selectIsBlocked);
   const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
 
@@ -39,8 +39,8 @@ function DominoTable() {
   const secondPlayer = 1;
 
   const processedHands: ProcessedDominoPiece[][] = hands.map(
-    (hand: DominoPiece[], player: number) =>
-      hand.map((piece: DominoPiece) => {
+    (hand, player: number) =>
+      hand.map((piece) => {
         const sides = getPlayableSides(snake, piece);
         return {
           piece,
@@ -48,11 +48,6 @@ function DominoTable() {
         };
       }),
   );
-  React.useEffect(() => {
-    if (!processedHands[turn].some(({ playable }) => playable) && !isBlocked) {
-      dispatch(pass());
-    }
-  }, [processedHands, turn, isBlocked]);
 
   function handlePlayChosenPiece(side: "left" | "right") {
     if (!chosenPiece) {
