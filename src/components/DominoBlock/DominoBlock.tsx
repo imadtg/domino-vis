@@ -112,6 +112,22 @@ function AnimatedDominoSvg({ piece, id, orientation }: AnimatedDominoSvgProps) {
         : 0;
   const previousRotateRef = React.useRef(0);
   // TODO: doubles sometime choose to take an opposite rotation to other dominos, making it uniform would be nice.
+  if (
+    Math.abs(
+      congruentInRange(rotate - previousRotateRef.current, 360, -180, 180),
+    ) > 180
+  ) {
+    console.log({
+      prevRot: previousRotateRef.current,
+      nextRot: rotate,
+      normalizedDifference: congruentInRange(
+        rotate - previousRotateRef.current,
+        360,
+        -180,
+        180,
+      ),
+    });
+  }
   const appliedRotation =
     previousRotateRef.current +
     congruentInRange(rotate - previousRotateRef.current, 360, -180, 180); // this is to avoid rotations of over 180 degrees.
@@ -128,9 +144,17 @@ function AnimatedDominoSvg({ piece, id, orientation }: AnimatedDominoSvgProps) {
       animate={{
         rotate: appliedRotation,
       }}
-      onAnimationStart={() => console.log(`started animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`)}
+      onAnimationStart={() =>
+        console.log(
+          `started animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`,
+        )
+      }
       onUpdate={() => console.log(`${appliedRotation}`)}
-      onAnimationEnd={() => console.log(`finished animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`)}
+      onAnimationEnd={() =>
+        console.log(
+          `finished animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`,
+        )
+      }
       style={{
         transformOrigin: "center",
         width: `${(BASE_WIDTH_FR / layoutWidthFr) * 100}%`,
@@ -141,11 +165,17 @@ function AnimatedDominoSvg({ piece, id, orientation }: AnimatedDominoSvgProps) {
   );
 }
 
-function congruentInRange(dividend: number, divisor: number, low: number, high: number): number { // returns a number congruent to the remainder of the division on divisor but in the range [low, high]
-  if(dividend < low){
+function congruentInRange(
+  dividend: number,
+  divisor: number,
+  low: number,
+  high: number,
+): number {
+  // returns a number congruent to the remainder of the division on divisor but in the range [low, high]
+  if (dividend < low) {
     return congruentInRange(dividend + divisor, divisor, low, high);
   }
-  if(dividend > high){
+  if (dividend > high) {
     return congruentInRange(dividend - divisor, divisor, low, high);
   }
   return dividend;

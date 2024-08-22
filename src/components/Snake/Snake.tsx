@@ -256,6 +256,13 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
       return;
     }
     setFirstPiece(snake[originPieceIndex - 1]);
+    setSegmentBreakpoints(
+      segmentBreakpoints.filter(
+        (index) =>
+          index + originPieceIndex - 1 > 0 &&
+          index + originPieceIndex - 1 < snake.length,
+      ),
+    );
   }
 
   function pushSnakeLeft() {
@@ -263,6 +270,13 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
       return;
     }
     setFirstPiece(snake[originPieceIndex + 1]);
+    setSegmentBreakpoints(
+      segmentBreakpoints.filter(
+        (index) =>
+          index + originPieceIndex + 1 > 0 &&
+          index + originPieceIndex + 1 < snake.length,
+      ),
+    );
   }
 
   // TODO: fix framer motion rotation animation of DominoBlock breaking after the effect below triggers a rerender.
