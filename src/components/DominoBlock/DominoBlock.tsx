@@ -52,13 +52,31 @@ function DominoBlock<E extends React.ElementType = "div">({
       : [BASE_WIDTH_FR, BASE_HEIGHT_FR];
 
   const aspectRatio = layoutWidthFr / layoutHeightFr;
-
-  // this is calculated here only to give a proper id and key to AnimatedDominoSvg.
-  // there really needs to be a way for render functions to determine their own keys...
+  
   const [bigPip, smallPip] =
     piece.left > piece.right
       ? [piece.left, piece.right]
       : [piece.right, piece.left];
+
+  const id = `${dominoGroupId}:${bigPip}-${smallPip}`;
+
+  const rotate =
+    orientation === "horizontal"
+      ? bigPip === piece.right
+        ? 90
+        : -90
+      : bigPip === piece.right
+        ? 180
+        : 0;
+  // there is no easier way to persist this for a specific domino piece, keys alone don't work when element changes parent.
+  // TODO: try to implement how framer motion persists values like this from their source code.
+  const previousRotation = previousRotationMap.get(id) ?? 0;
+  // TODO: doubles sometime choose to take an opposite rotation to other dominos, making it uniform would be nice.
+  const rotDiff = congruentInRange(rotate - previousRotation, 360, -180, 180);
+  const appliedRotation = previousRotation + rotDiff; // this is to avoid rotations of over 180 degrees.
+  React.useEffect(() => {
+    previousRotationMap.set(id, appliedRotation);
+  }, [appliedRotation]);
 
   const Tag = as || "div";
 
@@ -82,82 +100,34 @@ function DominoBlock<E extends React.ElementType = "div">({
         we determined layout manually above, we apply transforms to fit the svg to the layout.
       */}
       <div className="pointer-events-none absolute inset-0 grid grid-cols-1 grid-rows-1 place-items-center">
-        <AnimatedDominoSvg
-          piece={piece}
-          orientation={orientation}
-          id={`${dominoGroupId}:${bigPip}-${smallPip}`}
+        <motion.div // i would have used motion.svg directly, but it isn't supported by framer motion.
+          initial={false}
+          layout="preserve-aspect"
+          layoutId={`${dominoGroupId}:${bigPip}-${smallPip}`}
           key={`${dominoGroupId}:${bigPip}-${smallPip}`}
-        />
+          animate={{
+            rotate: appliedRotation,
+          }}
+          onAnimationStart={() =>
+            console.log(
+              `started animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`,
+            )
+          }
+          onUpdate={() => console.log(`${appliedRotation}`)}
+          onAnimationEnd={() =>
+            console.log(
+              `finished animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`,
+            )
+          }
+          style={{
+            transformOrigin: "center",
+            width: `${(BASE_WIDTH_FR / layoutWidthFr) * 100}%`,
+          }}
+        >
+          <DominoSvg topNumber={bigPip} bottomNumber={smallPip} />
+        </motion.div>
       </div>
     </Tag>
-  );
-}
-interface AnimatedDominoSvgProps {
-  piece: DominoPiece;
-  orientation: Orientation;
-  id: string;
-}
-
-// TODO: since keys won't help persist this, this should be merged back into the component above.
-function AnimatedDominoSvg({ piece, id, orientation }: AnimatedDominoSvgProps) {
-  const [bigPip, smallPip] =
-    piece.left > piece.right
-      ? [piece.left, piece.right]
-      : [piece.right, piece.left];
-
-  const rotate =
-    orientation === "horizontal"
-      ? bigPip === piece.right
-        ? 90
-        : -90
-      : bigPip === piece.right
-        ? 180
-        : 0;
-  // there is no easier way to persist this for a specific domino piece, keys alone don't work when element changes parent.
-  // TODO: try to implement how framer motion persists values like this from their source code.
-  const previousRotation = previousRotationMap.get(id) ?? 0;
-  // TODO: doubles sometime choose to take an opposite rotation to other dominos, making it uniform would be nice.
-  const rotDiff = congruentInRange(
-    rotate - previousRotation,
-    360,
-    -180,
-    180,
-  );
-  const appliedRotation = previousRotation + rotDiff; // this is to avoid rotations of over 180 degrees.
-  React.useEffect(() => {
-    previousRotationMap.set(id, appliedRotation);
-  }, [appliedRotation]);
-
-  const layoutWidthFr =
-    orientation === "horizontal" ? BASE_HEIGHT_FR : BASE_WIDTH_FR;
-
-  return (
-    <motion.div // i would have used motion.svg directly, but it isn't supported by framer motion.
-      initial={false}
-      layout="preserve-aspect"
-      layoutId={id}
-      key={id}
-      animate={{
-        rotate: appliedRotation,
-      }}
-      onAnimationStart={() =>
-        console.log(
-          `started animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`,
-        )
-      }
-      onUpdate={() => console.log(`${appliedRotation}`)}
-      onAnimationEnd={() =>
-        console.log(
-          `finished animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`,
-        )
-      }
-      style={{
-        transformOrigin: "center",
-        width: `${(BASE_WIDTH_FR / layoutWidthFr) * 100}%`,
-      }}
-    >
-      <DominoSvg topNumber={bigPip} bottomNumber={smallPip} />
-    </motion.div>
   );
 }
 
