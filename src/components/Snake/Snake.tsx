@@ -43,6 +43,20 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
     }
   }, [firstPiece, snake]);
 
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") {
+        pushSnakeLeft();
+      } else if (event.key === "ArrowRight") {
+        pushSnakeRight();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [pushSnakeLeft, pushSnakeRight]);
+
   // relative indices of pieces to know how to break the snake into segments at those indices.
   // priority of break is always to the right, ie breaking at [0|0] gives it to the right segment.
   const [segmentBreakpoints, setSegmentBreakpoints] = React.useState<number[]>(

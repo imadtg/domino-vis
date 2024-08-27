@@ -19,6 +19,8 @@ const BASE_HEIGHT_FR = 2;
 // this is proportional the base size of the domino block.
 const SIZE_SCALE = 6;
 
+const previousRotationMap = new Map();
+
 export type Variant = "greyed" | "highlighted" | "chosen" | "default";
 
 export type Orientation = "horizontal" | "vertical";
@@ -96,6 +98,7 @@ interface AnimatedDominoSvgProps {
   id: string;
 }
 
+// TODO: since keys won't help persist this, this should be merged back into the component above.
 function AnimatedDominoSvg({ piece, id, orientation }: AnimatedDominoSvgProps) {
   const [bigPip, smallPip] =
     piece.left > piece.right
@@ -110,28 +113,20 @@ function AnimatedDominoSvg({ piece, id, orientation }: AnimatedDominoSvgProps) {
       : bigPip === piece.right
         ? 180
         : 0;
-  const previousRotateRef = React.useRef(0);
+  // there is no easier way to persist this for a specific domino piece, keys alone don't work when element changes parent.
+  // TODO: try to implement how framer motion persists values like this from their source code.
+  const previousRotation = previousRotationMap.get(id) ?? 0;
   // TODO: doubles sometime choose to take an opposite rotation to other dominos, making it uniform would be nice.
-  if (
-    Math.abs(
-      congruentInRange(rotate - previousRotateRef.current, 360, -180, 180),
-    ) > 180
-  ) {
-    console.log({
-      prevRot: previousRotateRef.current,
-      nextRot: rotate,
-      normalizedDifference: congruentInRange(
-        rotate - previousRotateRef.current,
-        360,
-        -180,
-        180,
-      ),
-    });
-  }
-  const appliedRotation =
-    previousRotateRef.current +
-    congruentInRange(rotate - previousRotateRef.current, 360, -180, 180); // this is to avoid rotations of over 180 degrees.
-  previousRotateRef.current = appliedRotation;
+  const rotDiff = congruentInRange(
+    rotate - previousRotation,
+    360,
+    -180,
+    180,
+  );
+  const appliedRotation = previousRotation + rotDiff; // this is to avoid rotations of over 180 degrees.
+  React.useEffect(() => {
+    previousRotationMap.set(id, appliedRotation);
+  }, [appliedRotation]);
 
   const layoutWidthFr =
     orientation === "horizontal" ? BASE_HEIGHT_FR : BASE_WIDTH_FR;
@@ -141,6 +136,7 @@ function AnimatedDominoSvg({ piece, id, orientation }: AnimatedDominoSvgProps) {
       initial={false}
       layout="preserve-aspect"
       layoutId={id}
+      key={id}
       animate={{
         rotate: appliedRotation,
       }}

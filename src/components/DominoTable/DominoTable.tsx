@@ -59,6 +59,7 @@ function DominoTable() {
 
   function handleClickPiece(piece: DominoPiece) {
     // TODO: check if the piece is in the hand of the player whose turn it is.
+    setChosenPiece(undefined);
     if (snake.length === 0) {
       // first move is played automatically
       dispatch(playMove({ piece, side: "left" })); // choosing left arbitrarily since it doesn't matter.
