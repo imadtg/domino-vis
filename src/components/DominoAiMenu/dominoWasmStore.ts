@@ -2,6 +2,7 @@ import {
   initialize,
   playMove,
   pass,
+  isPlaying,
 } from "../../../lib/features/domino/dominoSlice";
 import {
   createConfiguredModule,
@@ -13,6 +14,7 @@ import {
 import {
   DominoIngameInfo,
   Move,
+  normalizeMove,
   turnAround,
 } from "../../../lib/features/domino/dominoUtils";
 import { startAppListening } from "../../../lib/listenerMiddleware";
@@ -30,8 +32,8 @@ startAppListening({
     }
     ModuleState.game = newGame(ModuleState.Module); // THIS IS A MEMORY LEAK!!!
     //console.log("ModuleState :", ModuleState);
-    action.payload.hands.map((hand, player) =>
-      hand.map((piece) =>
+    action.payload.hands.map(({pieces}, player) =>
+      pieces.map(({piece}) =>
         ModuleState.Module.ccall(
           "add_domino_to_player", // name of C function
           null, // return type
@@ -51,26 +53,11 @@ startAppListening({
     //console.log("ModuleState :", ModuleState);
     const { move } = newMovesContext(ModuleState.Module); // THIS IS A MEMORY LEAK!!!
     const { dominoGame } = listenerApi.getState();
-    if (dominoGame.gameStatus !== "playing") {
+    if (!isPlaying(dominoGame)) {
       return;
     }
     const { gameInfo } = dominoGame;
-    let shouldTurnPieceAround: boolean;
-    switch (action.payload.side) {
-      case "left": {
-        const leftPip = gameInfo.snake[0].left;
-        shouldTurnPieceAround = leftPip === action.payload.piece.right;
-        break;
-      }
-      case "right": {
-        const rightPip = gameInfo.snake.at(-1)?.right;
-        shouldTurnPieceAround = rightPip === action.payload.piece.left;
-        break;
-      }
-    }
-    const { left, right } = shouldTurnPieceAround
-      ? turnAround(action.payload.piece)
-      : action.payload.piece;
+    const { left, right } = normalizeMove(action.payload, gameInfo.snake).piece
     ModuleState.Module.ccall(
       "populate_move_from_components",
       null,

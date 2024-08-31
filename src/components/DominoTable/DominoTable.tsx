@@ -11,16 +11,12 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import {
   DominoPiece,
+  DominoPiecePresence,
   getPlayableSides,
 } from "@/lib/features/domino/dominoUtils";
 
 import Snake from "@/src/components/Snake";
 import Hand from "@/src/components/Hand";
-
-export interface ProcessedDominoPiece {
-  piece: DominoPiece;
-  playable: boolean;
-}
 
 function DominoTable() {
   const dispatch = useAppDispatch();
@@ -38,17 +34,6 @@ function DominoTable() {
   const firstPlayer = 0;
   const secondPlayer = 1;
 
-  const processedHands: ProcessedDominoPiece[][] = hands.map(
-    (hand, player: number) =>
-      hand.map((piece) => {
-        const sides = getPlayableSides(snake, piece);
-        return {
-          piece,
-          playable: sides.length > 0 && turn === player,
-        };
-      }),
-  );
-
   function handlePlayChosenPiece(side: "left" | "right") {
     if (!chosenPiece) {
       return;
@@ -60,9 +45,10 @@ function DominoTable() {
   function handleClickPiece(piece: DominoPiece) {
     // TODO: check if the piece is in the hand of the player whose turn it is.
     setChosenPiece(undefined);
-    if (snake.length === 0) {
+    if (snake.length === 0 || snake.length === 1 && snake[0].left === snake[0].right) {
       // first move is played automatically
-      dispatch(playMove({ piece, side: "left" })); // choosing left arbitrarily since it doesn't matter.
+      // the move on a first double is also automatic, until i get a better playing UI...
+      dispatch(playMove({ piece, side: "right" })); // choosing right arbitrarily since it doesn't matter.
       return;
     }
     const sides = getPlayableSides(snake, piece);
@@ -80,11 +66,13 @@ function DominoTable() {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-between">
+    <div className="grid grid-rows-[auto_1fr_auto] grid-cols-1 h-full items-center">
       <Hand
-        processedHand={processedHands[firstPlayer]}
-        onPieceClick={
-          turn == firstPlayer ? (piece) => handleClickPiece(piece) : undefined
+        hand={hands[firstPlayer]}
+        onPieceClick={(piece) =>
+          turn == firstPlayer && getPlayableSides(snake, piece).length > 0
+            ? () => handleClickPiece(piece)
+            : undefined
         }
       />
       <div className="relative w-screen flex-1 px-16 outline outline-offset-4 outline-pink-400">
@@ -94,9 +82,11 @@ function DominoTable() {
         />
       </div>
       <Hand
-        processedHand={processedHands[secondPlayer]}
-        onPieceClick={
-          turn == secondPlayer ? (piece) => handleClickPiece(piece) : undefined
+        hand={hands[secondPlayer]}
+        onPieceClick={(piece) =>
+          turn == secondPlayer && getPlayableSides(snake, piece).length > 0
+            ? () => handleClickPiece(piece)
+            : undefined
         }
       />
     </div>

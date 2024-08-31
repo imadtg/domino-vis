@@ -13,32 +13,55 @@ import {
 } from "@/lib/features/domino/dominoUtils";
 import DominoBlock from "../DominoBlock";
 import Button from "../Button";
+import { Gamemode } from "../DominoPlayground";
 
-function GameInitMenu() {
+interface GameInitMenuProps {
+  gamemode: Gamemode;
+}
+
+const INITIAL_GAME_INFO: Record<Gamemode, DominoIngameInfo> = {
+  "7/7": {
+    turn: 0,
+    snake: [],
+    hands: [
+      { pieces: [], count: 7 },
+      { pieces: [], count: 7 },
+    ],
+    boneyard: { pieces: [], count: 14 },
+  },
+  "14/14": {
+    turn: 0,
+    snake: [],
+    hands: [
+      { pieces: [], count: 14 },
+      { pieces: [], count: 14 },
+    ],
+    boneyard: { pieces: [], count: 0 },
+  },
+};
+
+const PLAYER = 1;
+
+function GameInitMenu({ gamemode }: GameInitMenuProps) {
   const dispatch = useAppDispatch();
+  const id = React.useId();
   const [initialGameInfo, setInitialGameInfo] = // TODO: move the temporary state into the domino slice.
-    React.useState<DominoIngameInfo>({
-      turn: 0,
-      snake: [],
-      hands: [[], []],
-    });
+    React.useState<DominoIngameInfo>(INITIAL_GAME_INFO[gamemode]);
 
-  const player = 0;
 
   function handleSubmit(event: React.SyntheticEvent) {
     event.preventDefault();
     if (
-      initialGameInfo.hands[0].length + initialGameInfo.hands[1].length ===
-      0
+      initialGameInfo.hands[PLAYER].pieces.length !==
+      initialGameInfo.hands[PLAYER].count
     ) {
-      if (
-        !window.confirm(
-          "Not selecting any domino will give all the dominoes to one player, do you wish proceed?",
-        )
-      ) {
-        return;
-      }
+      window.alert(
+        `Please select ${initialGameInfo.hands[PLAYER].count} domino pieces!
+        (You selected only ${initialGameInfo.hands[PLAYER].pieces.length}!)`,
+      );
+      return;
     }
+
     dispatch(initialize(withSelectRest(initialGameInfo)));
   }
 
@@ -48,42 +71,56 @@ function GameInitMenu() {
   ) {
     if (event.currentTarget.checked) {
       if (
-        initialGameInfo.hands[(player + 1) % 2].some((pieceOfHand) =>
-          comparePieces(piece, pieceOfHand),
-        )
+        initialGameInfo.hands[PLAYER].pieces.length >=
+        initialGameInfo.hands[PLAYER].count
       ) {
-        window.alert("That piece is taken!");
+        window.alert(
+          `You can't select more than ${initialGameInfo.hands[PLAYER].count} domino pieces!
+          (Unselect another domino piece then try again!)`,
+        );
         return;
       }
       setInitialGameInfo(
-        produce((oldGameInfo) => {
-          oldGameInfo.hands[player].push(piece);
-        }, initialGameInfo),
+        produce(initialGameInfo, (oldGameInfo) => {
+          oldGameInfo.hands[PLAYER].pieces.push({ piece, presence: "certain" });
+        }),
       );
     } else {
-      const index = initialGameInfo.hands[player].findIndex((pieceOfHand) =>
-        comparePieces(piece, pieceOfHand),
-      );
       setInitialGameInfo(
-        produce((oldGameInfo) => {
-          oldGameInfo.hands[player].splice(index, 1);
-        }, initialGameInfo),
+        produce(initialGameInfo, (oldGameInfo) => {
+          const piecesWithoutDeselected = oldGameInfo.hands[
+            PLAYER
+          ].pieces.filter(
+            ({ piece: pieceOfHand }) => !comparePieces(piece, pieceOfHand),
+          );
+          oldGameInfo.hands[PLAYER].pieces = piecesWithoutDeselected;
+        }),
       );
     }
   }
 
   function withSelectRest(gameInfo: DominoIngameInfo) {
+    // spreads unselected dominoes on other hands.
     // TODO: rewrite this.
     const dominoes = getAllDominoes();
     const remainingDominoes = dominoes.filter(
       (piece) =>
-        !gameInfo.hands[player].some((handInOtherPiece) =>
-          comparePieces(piece, handInOtherPiece),
+        !gameInfo.hands[PLAYER].pieces.some(({ piece: selectedPiece }) =>
+          comparePieces(piece, selectedPiece),
         ),
     );
-    return produce((oldGameInfo) => {
-      oldGameInfo.hands[(player + 1) % 2] = remainingDominoes;
-    })(gameInfo); // i wonder how produce doesn't break in the other overloads used in the codebase...
+    return produce(gameInfo, (oldGameInfo) => {
+      const otherHands = [
+        ...oldGameInfo.hands.filter((hand, index) => index !== PLAYER),
+        oldGameInfo.boneyard,
+      ];
+      otherHands.forEach((hand) => {
+        hand.pieces = remainingDominoes.map((piece) => ({
+          piece,
+          presence: "possible",
+        }));
+      });
+    });
   }
 
   return (
@@ -91,41 +128,72 @@ function GameInitMenu() {
       onSubmit={handleSubmit}
       className="flex flex-col justify-items-center gap-y-[16px] p-[8px]"
     >
-      <fieldset className="grid grid-cols-4 grid-rows-7 gap-[16px] p-[1em] landscape:grid-cols-7 landscape:grid-rows-4">
-        <legend className="absolute -translate-y-[100%] transform">
-          Choose dominoes for the {player === 0 ? "first" : "second"} player:
+      <fieldset className="flex flex-col justify-items-center gap-y-[16px]">
+        <legend>
+          Select {initialGameInfo.hands[PLAYER].count} domino pieces for your
+          hand:
         </legend>
-        {getAllDominoes().map((piece) => {
-          const pieceId = `${piece.left}-${piece.right}`;
-          const checked = initialGameInfo.hands[player].some((pieceOfHand) =>
-            comparePieces(piece, pieceOfHand),
-          );
-          const isTaken = initialGameInfo.hands[(player + 1) % 2].some(
-            (pieceOfHand) => comparePieces(piece, pieceOfHand),
-          );
-          return (
-            <div
-              key={pieceId}
-              className="relative w-min focus-within:outline" // TODO: fix the tiny gaps between this wrapper and the DominoBlock
-            >
-              <label className="block" htmlFor={pieceId}>
-                <DominoBlock
-                  piece={piece}
-                  orientation="horizontal"
-                  variant={isTaken ? "greyed" : checked ? "chosen" : "default"}
+        <div className="grid grid-cols-4 grid-rows-7 gap-[16px] p-[1em] landscape:grid-cols-7 landscape:grid-rows-4">
+          {getAllDominoes().map((piece) => {
+            const pieceId = `${id}-${piece.left}-${piece.right}`;
+            const checked = initialGameInfo.hands[PLAYER].pieces.some(
+              ({ piece: pieceOfHand }) => comparePieces(piece, pieceOfHand),
+            );
+            return (
+              <div
+                key={pieceId}
+                className="relative w-min focus-within:outline" // TODO: fix the tiny gaps between this wrapper and the DominoBlock
+              >
+                <label className="block" htmlFor={pieceId}>
+                  <DominoBlock
+                    piece={piece}
+                    orientation="horizontal"
+                    variant={checked ? "chosen" : "default"}
+                  />
+                </label>
+                <input
+                  id={pieceId}
+                  className="absolute inset-0 block opacity-0"
+                  type="checkbox"
+                  value={`${piece.left}-${piece.right}`}
+                  checked={checked}
+                  onChange={(event) => handleCheck(event, piece)}
                 />
-              </label>
-              <input
-                id={pieceId}
-                className="block absolute inset-0 opacity-0"
-                type="checkbox"
-                value={`${piece.left}-${piece.right}`}
-                checked={checked}
-                onChange={(event) => handleCheck(event, piece)}
-              />
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Select starting player:</legend>
+        <label htmlFor={`${id}-${PLAYER}`}>You</label>
+        <input
+          id={`${id}-${PLAYER}`}
+          type="radio"
+          value={PLAYER}
+          checked={initialGameInfo.turn === PLAYER}
+          onChange={(event) => {
+            setInitialGameInfo(
+              produce(initialGameInfo, (oldGameInfo) => {
+                oldGameInfo.turn = parseInt(event.target.value);
+              }),
+            );
+          }}
+        />
+        <label htmlFor={`${id}-${(PLAYER + 1) % 2}`}>Opponent</label>
+        <input
+          id={`${id}-${(PLAYER + 1) % 2}`}
+          type="radio"
+          value={(PLAYER + 1) % 2}
+          checked={initialGameInfo.turn === (PLAYER + 1) % 2}
+          onChange={(event) => {
+            setInitialGameInfo(
+              produce(initialGameInfo, (oldGameInfo) => {
+                oldGameInfo.turn = parseInt(event.target.value);
+              }),
+            );
+          }}
+        />
       </fieldset>
       <div className="flex basis-[48px] justify-center px-[32px]">
         <Button>Start game</Button>
