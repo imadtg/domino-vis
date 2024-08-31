@@ -66,7 +66,7 @@ function DominoTable() {
   }
 
   return (
-    <div className="grid grid-rows-[auto_1fr_auto] grid-cols-1 h-full items-center">
+    <div className="flex flex-col h-full items-center">
       <Hand
         hand={hands[firstPlayer]}
         onPieceClick={(piece) =>

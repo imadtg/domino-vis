@@ -67,8 +67,9 @@ function DominoBlock<E extends React.ElementType = "div">({
   if (orientation === "horizontal") {
     rotate = congruentInRange(rotate - 90, 360, -180, 180);
   }
+  // even with this, doubles are acting strangely...
   if (reverse) {
-    rotate = congruentInRange(rotate + 180, 360, -180, 180);
+    rotate = congruentInRange(rotate - 180, 360, -180, 180);
   }
   
   const id = `${dominoGroupId}:${bigPip}-${smallPip}`;
@@ -112,7 +113,7 @@ function DominoBlock<E extends React.ElementType = "div">({
           animate={{
             rotate: appliedRotation,
           }}
-          onAnimationStart={() =>
+          /*onAnimationStart={() =>
             console.log(
               `started animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`,
             )
@@ -122,7 +123,7 @@ function DominoBlock<E extends React.ElementType = "div">({
             console.log(
               `finished animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`,
             )
-          }
+          }*/
           style={{
             transformOrigin: "center",
             width: `${(BASE_WIDTH_FR / layoutWidthFr) * 100}%`,

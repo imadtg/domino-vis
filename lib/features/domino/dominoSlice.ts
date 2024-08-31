@@ -80,8 +80,8 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
         if (!isPlaying(state)) {
           return;
         }
-        [...state.gameInfo.hands, state.gameInfo.boneyard].forEach(({ pieces }) => {
-          pieces = pieces.filter(
+        [...state.gameInfo.hands, state.gameInfo.boneyard].forEach((hand) => {
+          hand.pieces = hand.pieces.filter(
             ({ piece }) => !comparePieces(piece, action.payload.piece),
           );
         });
