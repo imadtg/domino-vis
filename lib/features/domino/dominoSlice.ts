@@ -100,7 +100,7 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
           }
         }
         state.passCounter = 0;
-        gameInfo.turn = (gameInfo.turn + 1) % 2;
+        gameInfo.turn = (gameInfo.turn + 1) % 2; // hardcoded for two players for now
       },
     ),
     pass: create.reducer((state: DominoGame) => {

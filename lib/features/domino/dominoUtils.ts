@@ -102,7 +102,7 @@ export function normalizeMove(move: Move, snake: SnakeInfo): Move {
   return { ...move, piece: turnAround(move.piece) };
 }
 
-export function comparePieces(
+export function comparePieces( // TODO: rename to piecesAreSame or something more significative of its return value
   piece1: DominoPiece,
   piece2: DominoPiece,
 ): boolean {
