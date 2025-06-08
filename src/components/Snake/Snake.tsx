@@ -14,6 +14,9 @@ import {
 } from "./Snake.helpers";
 import { css, styled } from "styled-components";
 import Button from "../Button";
+import { useFloating } from "@floating-ui/react";
+import composeRefs from "@seznam/compose-react-refs";
+import clsx from "clsx";
 
 type Direction = "row" | "column" | "row-reverse" | "column-reverse";
 
@@ -177,6 +180,7 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
         containerRef: containerRef.current,
         originSegmentIndex,
       });
+      throw new Error("something is terribly wrong, check console.");
       return false;
     }
     const { direction } = directedSegments[segmentIndex];
@@ -185,7 +189,7 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
       segmentRefs.current[segmentIndex],
       containerRef.current,
     );
-    // NOTE: while this does detect overflow, it doesn't take into account if future doubles played on this segment would overflow
+    // NOTE: while this does detect overflow, it doesn't take into account if future doubles played on this segment would overflow (since they are wider than the rest of dominoes in the segment)
     // this can be trivially mitigated by artificial padding on the wrapper that will contain the container of the snake.
     const TEST_AGAINST_CONTAINER_LEFT: Record<Direction, () => boolean> = {
       row: () => overflowInfo.collidedLeft,
@@ -327,22 +331,25 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
     }
   });
 
-  function segmentIsAnchoredOnDouble(index: number) {
+  const pieceRefs = React.useRef<Map<DominoPiece, HTMLDivElement>>(new Map());
+
+  function segmentIsAnchoredOn(index: number): DominoPiece | undefined {
     if (
       index === originSegmentIndex ||
       typeof originSegmentIndex === "undefined"
     ) {
-      return false;
+      return undefined;
     }
     if (index > originSegmentIndex) {
-      const anchorPiece = segments[index - 1].at(-1) as DominoPiece;
-      return anchorPiece.left === anchorPiece.right;
+      const anchorPiece = segments[index - 1].at(-1);
+      return anchorPiece;
     }
     const anchorPiece = segments[index + 1][0];
-    return anchorPiece.left === anchorPiece.right;
+    return anchorPiece;
   }
 
   // we need a special DOM order for anchor positioning to work...
+  // this isnt necessary anymore but it doesnt hurt to keep in case anchored positioning becomes an option in the future
   const leftDirectedSegments = directedSegments
     .map((segmentInfo, index) => ({ ...segmentInfo, index }))
     .slice(0, originSegmentIndex)
@@ -381,7 +388,27 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
           debug={debug}
           onPieceClick={debug ? (piece) => toggleBreakpoint(piece) : undefined}
           highlightPiece={debug ? pieceIsBreakpoint : undefined}
-          isAnchoredOnDouble={segmentIsAnchoredOnDouble(index)}
+          isAnchoredOnDouble={(() => {
+            const anchorPiece = segmentIsAnchoredOn(index);
+            if (anchorPiece) {
+              return anchorPiece.left === anchorPiece.right;
+            }
+            return false;
+          })()}
+          anchoredOn={(() => {
+            const anchorPiece = segmentIsAnchoredOn(index);
+            if (anchorPiece) {
+              return pieceRefs.current.get(anchorPiece);
+            }
+          })()}
+          setPieceRef={(piece, element) => {
+            pieceRefs.current.set(piece, element);
+            pieceRefs.current.set(turnAround(piece), element); // just to be safe
+            return () => {
+              pieceRefs.current.delete(piece);
+              pieceRefs.current.delete(turnAround(piece)); // these could bite if somehow the snake has the same piece in two orientations, but that should be impossible.
+            };
+          }}
         />
       ))}
       <Button
@@ -410,6 +437,8 @@ interface SnakeSegmentProps {
   onPieceClick?: (piece: DominoPiece) => void;
   highlightPiece?: (piece: DominoPiece) => boolean;
   isAnchoredOnDouble?: boolean;
+  anchoredOn: HTMLElement | undefined;
+  setPieceRef: (piece: DominoPiece, element: HTMLDivElement) => () => void;
 }
 
 // TODO: unhardcode ref type being on a <div/>.
@@ -424,7 +453,9 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
       onPieceClick,
       highlightPiece,
       isAnchoredOnDouble = false,
+      anchoredOn,
       debug,
+      setPieceRef,
     }: SnakeSegmentProps,
     ref,
   ) => {
@@ -435,26 +466,63 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
       return "horizontal";
     }
 
+    // TODO: handle double special placements and responsive spacing
+
+    const { refs, floatingStyles } = useFloating(
+      index !== 0
+        ? {
+            transform: false,
+            elements: {
+              reference: anchoredOn,
+            },
+            placement:
+              index < 0 // TODO: use a Record of functions like we did before with anchored positioning, or dont because this is already typesafe
+                ? (() => {
+                    switch (direction) {
+                      case "row":
+                        return "left";
+                      case "column":
+                        return "top";
+                      case "row-reverse":
+                        return "right";
+                      case "column-reverse":
+                        return "bottom";
+                    }
+                  })()
+                : (() => {
+                    switch (direction) {
+                      case "row":
+                        return "right";
+                      case "column":
+                        return "bottom";
+                      case "row-reverse":
+                        return "left";
+                      case "column-reverse":
+                        return "top";
+                    }
+                  })(),
+          }
+        : {},
+    );
+
+    const TAILWIND_CLASSNAMES_FLEX_DIRECTIONS: Record<Direction, string> = { // this is needed because interpolation wont work with tailwind due to purging
+      row: 'flex-row',
+      column: 'flex-col',
+      "row-reverse": 'flex-row-reverse',
+      "column-reverse": 'flex-col-reverse',
+    }
+
     return (
-      <SegmentWrapper
-        $index={index}
-        $direction={direction}
-        $isAnchoredOnDouble={isAnchoredOnDouble}
-        className="absolute flex items-center gap-[--spacing]"
-        ref={ref}
+      <div
+        className={clsx("absolute flex items-center gap-8", TAILWIND_CLASSNAMES_FLEX_DIRECTIONS[direction])} // non-responsive gaps for now...
+        ref={
+          index !== 0 ? composeRefs<HTMLDivElement>(ref, refs.setFloating) : ref
+        }
+        style={index !== 0 ? floatingStyles : undefined}
       >
         {segment.map((piece, pieceIndex) => {
           const isLeftmostPiece = pieceIndex === 0;
           const isRightmostPiece = pieceIndex === segment.length - 1;
-
-          let anchorName;
-          if (segment.length === 1) {
-            anchorName = `--left-${index}, --right-${index}`;
-          } else if (isLeftmostPiece) {
-            anchorName = `--left-${index}`;
-          } else if (isRightmostPiece) {
-            anchorName = `--right-${index}`;
-          }
 
           let orientation: Orientation =
             direction === "row" || direction === "row-reverse"
@@ -489,8 +557,13 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
           }
 
           return (
-            <DominoBlockWrapper
-              $anchorName={anchorName}
+            <div
+              className="shrink-0"
+              ref={(element) => {
+                if (element) {
+                  return setPieceRef(piece, element);
+                }
+              }}
               key={`${piece.left}-${piece.right}`}
             >
               <DominoBlock
@@ -505,26 +578,14 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
                 onClick={onClick}
                 variant={variant}
               />
-            </DominoBlockWrapper>
+            </div>
           );
         })}
-      </SegmentWrapper>
+      </div>
     );
   },
 );
-
-// anchor madness...
-const DominoBlockWrapper = styled.div<{ $anchorName?: string }>`
-  flex-shrink: 0;
-  anchor-name: ${(props) => (props.$anchorName ? props.$anchorName : "none")};
-`;
-
-interface SegmentWrapperProps {
-  $index: number;
-  $direction: Direction;
-  $isAnchoredOnDouble: boolean;
-}
-
+/*
 const SegmentWrapper = styled.div<SegmentWrapperProps>`
   --spacing: 2px;
   @media (min-width: 640px) {
@@ -675,5 +736,5 @@ const RIGHT_STYLE_FOR_DIRECTION: Record<
           `}
   `,
 };
-
+*/
 export default Snake;

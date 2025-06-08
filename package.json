@@ -6,7 +6,10 @@
     "start": "next start"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.12",
+    "@oddbird/css-anchor-positioning": "^0.6.0",
     "@reduxjs/toolkit": "^2.2.0",
+    "@seznam/compose-react-refs": "^1.0.6",
     "clsx": "^2.1.1",
     "detect-element-overflow": "^1.4.2",
     "framer-motion": "^11.3.21",
