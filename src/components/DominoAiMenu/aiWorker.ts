@@ -9,7 +9,7 @@ import {
 import { ModuleState } from "./dominoWasmStore";
 
 export function getAiMove(Module: any, game: number, depth: number): Move {
-  const { move } = newMovesContext(Module); // MEMORY LEAK!!!
+  const { move } = newMovesContext(Module); // FIXME: MEMORY LEAK!!!
   Module.ccall(
     "populate_best_move",
     null,

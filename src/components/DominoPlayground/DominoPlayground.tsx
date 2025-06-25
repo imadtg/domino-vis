@@ -19,11 +19,15 @@ import "../DominoAiMenu/dominoWasmStore";
 export type Gamemode = "14/14" | "7/7";
 
 export default function DominoPlayground() {
+  // TODO: rename this to DominoGame as to not confuse it with the playground pages
   const [gamemode, setGamemode] = React.useState<Gamemode>();
   const gameStatus = useAppSelector(({ dominoGame }) => dominoGame.gameStatus);
   const dispatch = useAppDispatch();
-  // TODOD: make this autopass functionality a configurable ingame option
+  // TODO: make this autopass functionality a configurable ingame option, or atleast give enough feedback that a player has passed
+  // After more thought, this is a good default because the purpose of this entire App is to be a GUI to a domino ai, not a multiplayer game, thats another rabbit hole (hint: P2P)
+  // but visible feedback is still welcome...
   React.useEffect(() => {
+    console.log("now we are using a dispatch for autopass"); // debug print to see if this closure's dispatch is stale (in comparison to domino ai store listener changing it)
     const unsubscribe = dispatch(
       addAppListener({
         matcher: isAnyOf(playMove, pass, initialize),
@@ -47,7 +51,7 @@ export default function DominoPlayground() {
       }),
     );
     return unsubscribe;
-  });
+  }, [dispatch]);
   return (
     <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
       {!gamemode ? (

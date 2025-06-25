@@ -19,7 +19,7 @@ import {
 } from "../../../lib/features/domino/dominoUtils";
 import { startAppListening } from "../../../lib/listenerMiddleware";
 import { PayloadAction } from "@reduxjs/toolkit";
-console.log('a bug')
+console.log("domino ai listener is going to attach itself...");
 export let ModuleState: { Module?: any; game?: number } = {};
 
 startAppListening({
@@ -30,10 +30,10 @@ startAppListening({
     if (typeof ModuleState.Module === "undefined") {
       ModuleState.Module = await createConfiguredModule();
     }
-    ModuleState.game = newGame(ModuleState.Module); // THIS IS A MEMORY LEAK!!!
+    ModuleState.game = newGame(ModuleState.Module); // THIS IS A FIXME: MEMORY LEAK!!!
     console.log("ModuleState :", ModuleState);
-    action.payload.hands.map(({pieces}, player) =>
-      pieces.map(({piece}) =>
+    action.payload.hands.map(({ pieces }, player) =>
+      pieces.map(({ piece }) =>
         ModuleState.Module.ccall(
           "add_domino_to_player", // name of C function
           null, // return type
@@ -51,13 +51,15 @@ startAppListening({
   effect: async (action: PayloadAction<Move>, listenerApi) => {
     console.log("Wasm middleware listened for playMove: ", action.payload);
     console.log("ModuleState :", ModuleState);
-    const { move } = newMovesContext(ModuleState.Module); // THIS IS A MEMORY LEAK!!!
-    const { dominoGame } = listenerApi.getState();
+    const { move } = newMovesContext(ModuleState.Module); // THIS IS A FIXME: MEMORY LEAK!!!
+    const { dominoGame } = listenerApi.getOriginalState();
     if (!isPlaying(dominoGame)) {
       return;
     }
     const { gameInfo } = dominoGame;
-    const { left, right } = normalizeMove(action.payload, gameInfo.snake).piece
+    console.log(gameInfo);
+    const { left, right } = normalizeMove(action.payload, gameInfo.snake).piece;
+    console.log(`playing [${left}|${right}] on the ${action.payload.side}`);
     ModuleState.Module.ccall(
       "populate_move_from_components",
       null,
@@ -82,3 +84,5 @@ startAppListening({
     printGame(ModuleState.Module, ModuleState.game);
   },
 });
+
+console.log("domino ai listener has attached itself!");
