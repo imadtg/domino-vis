@@ -163,7 +163,7 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
               ),
           );
 
-        state.gameInfo.hands[state.gameInfo.turn].pieces.concat(
+        state.gameInfo.hands[state.gameInfo.turn].pieces = state.gameInfo.hands[state.gameInfo.turn].pieces.concat(
           pickableBoneyardPieces.map((piece) => ({
             piece,
             presence: "possible",
