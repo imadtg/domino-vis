@@ -49,7 +49,7 @@ function DominoAiMenu({ className }: { className: string }) {
     ) {
       return;
     }
-    setBestMove(getAiMove(ModuleState.Module, ModuleState.game, event.data));
+    setBestMove(getAiMove(ModuleState.Module, ModuleState.game, parseInt(depth)));
   }
   function playBestMove() {
     if (typeof bestMove === "undefined") {
