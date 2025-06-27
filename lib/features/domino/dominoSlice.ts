@@ -100,10 +100,11 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
           }
         }
         state.passCounter = 0;
-        gameInfo.turn = (gameInfo.turn + 1) % 2; // hardcoded for two players for now
+        gameInfo.turn = (gameInfo.turn + 1) % 2; // HACK: hardcoded for two players for now
       },
     ),
     pass: create.reducer((state: DominoGame) => {
+      // TODO: move this first part into a separate action of 'absenting', this would make it hard to synchronize the wasm listener middleware though...
       if (!isPlaying(state)) {
         return;
       }
@@ -117,6 +118,60 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
       state.gameInfo.turn = (state.gameInfo.turn + 1) % 2;
       state.passCounter++;
     }),
+    perfectPick: create.reducer(
+      (state: DominoGame, action: PayloadAction<DominoPiece>) => {
+        if (!isPlaying(state)) {
+          return;
+        }
+        state.gameInfo.hands[state.gameInfo.turn].pieces = state.gameInfo.hands[
+          state.gameInfo.turn
+        ].pieces.filter(
+          ({ piece }) =>
+            getPlayableSides(state.gameInfo.snake, piece).length === 0,
+        );
+        state.gameInfo.boneyard.pieces = state.gameInfo.boneyard.pieces.filter(
+          ({ piece }) => !comparePieces(piece, action.payload),
+        );
+        state.gameInfo.hands[state.gameInfo.turn].pieces.push({
+          piece: { ...action.payload, origin: "boneyard" }, // to ensure that the animations work, we wont consider action.payload's origin, which should already be 'boneyard' in the regular circumstances... just in case somehow it comes in undefined or wrong...
+          presence: "certain",
+        });
+        state.gameInfo = collapse(state.gameInfo);
+      },
+    ),
+    imperfectPick: create.reducer(
+      (state: DominoGame, action: PayloadAction<number>) => {
+        if (!isPlaying(state)) {
+          return;
+        }
+        state.gameInfo.hands[state.gameInfo.turn].pieces = state.gameInfo.hands[
+          state.gameInfo.turn
+        ].pieces.filter(
+          ({ piece }) =>
+            getPlayableSides(state.gameInfo.snake, piece).length === 0,
+        );
+
+        state.gameInfo.boneyard.count -= action.payload;
+        state.gameInfo.hands[state.gameInfo.turn].count += action.payload;
+        const pickableBoneyardPieces = state.gameInfo.boneyard.pieces
+          .map(({ piece }) => piece)
+          .filter(
+            (piece) =>
+              getPlayableSides(state.gameInfo.snake, piece).length === 0 && // only pieces that cant be played because that is the definition of an imperfect pick, a pick which is not revealed, a playable pick is played immediately and thus should be a perfect pick
+              !state.gameInfo.hands[state.gameInfo.turn].pieces.some(
+                ({ piece: handPiece }) => comparePieces(piece, handPiece),
+              ),
+          );
+
+        state.gameInfo.hands[state.gameInfo.turn].pieces.concat(
+          pickableBoneyardPieces.map((piece) => ({
+            piece,
+            presence: "possible",
+          })),
+        );
+        state.gameInfo = collapse(state.gameInfo);
+      },
+    ),
   }),
   selectors: {
     selectHands: (state) =>
@@ -133,7 +188,7 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
   },
 });
 
-export const { initialize, playMove, pass } = dominoSlice.actions;
+export const { initialize, playMove, pass, perfectPick, imperfectPick } = dominoSlice.actions;
 
 export const {
   selectHands,

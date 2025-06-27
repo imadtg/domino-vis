@@ -3,6 +3,7 @@ import { produce } from "immer";
 export interface DominoPiece {
   left: number;
   right: number;
+  origin?: number | 'boneyard'; // keep track of each piece's origin (here, it simply means where it had certain presence for the first time) for animation purposes
 }
 
 export type Side = "left" | "right";
@@ -36,6 +37,7 @@ export interface DominoIngameInfo {
 export function collapse(gameInfo: DominoIngameInfo): DominoIngameInfo {
   let collapsed = false;
   // so many bugs awaiting discovery in this jungle of arrays...
+  // TODO: separate this into smaller collapse functions and utilities
   const nextGameInfo = produce(gameInfo, (oldGameInfo) => {
     [...oldGameInfo.hands, oldGameInfo.boneyard].forEach((hand, index) => {
       if (
@@ -62,25 +64,27 @@ export function collapse(gameInfo: DominoIngameInfo): DominoIngameInfo {
           },
         );
       }
-      if (hand.count === 0 && hand.pieces.length > 0) {
+      const certainPiecePresences = hand.pieces.filter(({presence}) => presence === 'certain')
+      if (hand.count === certainPiecePresences.length && hand.pieces.length > hand.count) {
         collapsed = true;
-        hand.pieces = [];
-        const piecePresences = [
-          ...oldGameInfo.hands.flatMap(({ pieces }) => pieces),
-          ...oldGameInfo.boneyard.pieces,
-        ];
-        const possiblePiecePresences = piecePresences.filter(
-          ({ presence }) => presence === "possible",
-        );
-        possiblePiecePresences.forEach((piecePresence) => {
-          if (
-            possiblePiecePresences.filter(({ piece }) =>
-              comparePieces(piece, piecePresence.piece),
-            ).length === 1
-          ) {
-            piecePresence.presence = "certain";
-          }
-        });
+        hand.pieces = certainPiecePresences;
+      }
+    });
+    // TODO: should this trigger another collapse?
+    const piecePresences = [
+      ...oldGameInfo.hands.flatMap(({ pieces }) => pieces),
+      ...oldGameInfo.boneyard.pieces,
+    ];
+    const possiblePiecePresences = piecePresences.filter(
+      ({ presence }) => presence === "possible",
+    );
+    possiblePiecePresences.forEach((piecePresence) => {
+      if (
+        possiblePiecePresences.filter(({ piece }) =>
+          comparePieces(piece, piecePresence.piece),
+        ).length === 1
+      ) {
+        piecePresence.presence = "certain";
       }
     });
   });
@@ -115,8 +119,8 @@ export function comparePieces( // TODO: rename to piecesAreSame or something mor
   return false;
 }
 
-export function turnAround({ left, right }: DominoPiece): DominoPiece {
-  return { left: right, right: left };
+export function turnAround({ left, right, ...rest }: DominoPiece): DominoPiece { // rest is only holding the origin attribute for now but this is more future proof
+  return { left: right, right: left, ...rest };
 }
 
 export function getAllDominoes(): DominoPiece[] {

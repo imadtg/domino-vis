@@ -40,14 +40,13 @@ const INITIAL_GAME_INFO: Record<Gamemode, DominoIngameInfo> = {
   },
 };
 
-const PLAYER = 1;
+const PLAYER = 1; // the ID of the player using the GUI against the opponent, the goal of this entire GUI being an AI assistant to this player
 
 function GameInitMenu({ gamemode }: GameInitMenuProps) {
   const dispatch = useAppDispatch();
   const id = React.useId();
   const [initialGameInfo, setInitialGameInfo] = // TODO: move the temporary state into the domino slice.
     React.useState<DominoIngameInfo>(INITIAL_GAME_INFO[gamemode]);
-
 
   function handleSubmit(event: React.SyntheticEvent) {
     event.preventDefault();
@@ -116,10 +115,17 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
       ];
       otherHands.forEach((hand) => {
         hand.pieces = remainingDominoes.map((piece) => ({
-          piece,
+          piece: {...piece}, // make a shallow copy to differentiate pieces of different hands
           presence: "possible",
         }));
       });
+      // Annotate pieces with their origins for animation purposes
+      oldGameInfo.boneyard.pieces.forEach(
+        ({ piece }) => (piece.origin = "boneyard"),
+      );
+      oldGameInfo.hands.forEach((hand, playerIndex) =>
+        hand.pieces.forEach(({ piece }) => (piece.origin = playerIndex)),
+      );
     });
   }
 

@@ -71,8 +71,8 @@ function DominoBlock<E extends React.ElementType = "div">({
   if (reverse) {
     rotate = congruentInRange(rotate - 180, 360, -180, 180);
   }
-  
-  const id = `${dominoGroupId}:${bigPip}-${smallPip}`;
+
+  const id = `${dominoGroupId}:${bigPip}-${smallPip}:${typeof piece.origin === "undefined" ? "unknown" : piece.origin}-origin`;
   // there is no easier way to persist this for a specific domino piece, keys alone don't work when element changes parent.
   // TODO: try to implement how framer motion persists values like this from their source code.
   const previousRotation = previousRotationMap.get(id) ?? 0;
@@ -108,8 +108,8 @@ function DominoBlock<E extends React.ElementType = "div">({
         <motion.div // i would have used motion.svg directly, but it isn't supported by framer motion.
           initial={false}
           layout="preserve-aspect"
-          layoutId={`${dominoGroupId}:${bigPip}-${smallPip}`}
-          key={`${dominoGroupId}:${bigPip}-${smallPip}`}
+          layoutId={id}
+          key={id}
           animate={{
             rotate: appliedRotation,
           }}
