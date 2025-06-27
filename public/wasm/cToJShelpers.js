@@ -1,4 +1,6 @@
 import createModule from "./domino-c";
+// TODO: move this entire module out of public directory, and encapsulate it with all the logic for AI moves somewhere else
+// for the other remaining two files, domino-c.js and domino-c.wasm, they can remain here but should be with their originating build environment as a git submodule.
 
 var ModuleConfig = {
   locateFile: function (file) {

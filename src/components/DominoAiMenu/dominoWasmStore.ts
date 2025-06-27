@@ -2,6 +2,7 @@ import {
   initialize,
   playMove,
   pass,
+  isPlaying,
 } from "../../../lib/features/domino/dominoSlice";
 import {
   createConfiguredModule,
@@ -13,25 +14,26 @@ import {
 import {
   DominoIngameInfo,
   Move,
+  normalizeMove,
   turnAround,
 } from "../../../lib/features/domino/dominoUtils";
 import { startAppListening } from "../../../lib/listenerMiddleware";
 import { PayloadAction } from "@reduxjs/toolkit";
-
+console.log("domino ai listener is going to attach itself...");
 export let ModuleState: { Module?: any; game?: number } = {};
 
 startAppListening({
   actionCreator: initialize,
   effect: async (action: PayloadAction<DominoIngameInfo>, listenerApi) => {
     // Run whatever additional side-effect-y logic you want here
-    //console.log("Wasm middleware listened for initialize: ", action.payload);
+    console.log("Wasm middleware listened for initialize: ", action.payload);
     if (typeof ModuleState.Module === "undefined") {
       ModuleState.Module = await createConfiguredModule();
     }
-    ModuleState.game = newGame(ModuleState.Module); // THIS IS A MEMORY LEAK!!!
-    //console.log("ModuleState :", ModuleState);
-    action.payload.hands.map((hand, player) =>
-      hand.map((piece) =>
+    ModuleState.game = newGame(ModuleState.Module); // THIS IS A FIXME: MEMORY LEAK!!!
+    console.log("ModuleState :", ModuleState);
+    action.payload.hands.map(({ pieces }, player) =>
+      pieces.map(({ piece }) =>
         ModuleState.Module.ccall(
           "add_domino_to_player", // name of C function
           null, // return type
@@ -40,37 +42,24 @@ startAppListening({
         ),
       ),
     );
-    //printGame(ModuleState.Module, ModuleState.game);
+    printGame(ModuleState.Module, ModuleState.game);
   },
 });
 
 startAppListening({
   actionCreator: playMove,
   effect: async (action: PayloadAction<Move>, listenerApi) => {
-    //console.log("Wasm middleware listened for playMove: ", action.payload);
-    //console.log("ModuleState :", ModuleState);
-    const { move } = newMovesContext(ModuleState.Module); // THIS IS A MEMORY LEAK!!!
-    const { dominoGame } = listenerApi.getState();
-    if (dominoGame.gameStatus !== "playing") {
+    console.log("Wasm middleware listened for playMove: ", action.payload);
+    console.log("ModuleState :", ModuleState);
+    const { move } = newMovesContext(ModuleState.Module); // THIS IS A FIXME: MEMORY LEAK!!!
+    const { dominoGame } = listenerApi.getOriginalState();
+    if (!isPlaying(dominoGame)) {
       return;
     }
     const { gameInfo } = dominoGame;
-    let shouldTurnPieceAround: boolean;
-    switch (action.payload.side) {
-      case "left": {
-        const leftPip = gameInfo.snake[0].left;
-        shouldTurnPieceAround = leftPip === action.payload.piece.right;
-        break;
-      }
-      case "right": {
-        const rightPip = gameInfo.snake.at(-1)?.right;
-        shouldTurnPieceAround = rightPip === action.payload.piece.left;
-        break;
-      }
-    }
-    const { left, right } = shouldTurnPieceAround
-      ? turnAround(action.payload.piece)
-      : action.payload.piece;
+    console.log(gameInfo);
+    const { left, right } = normalizeMove(action.payload, gameInfo.snake).piece;
+    console.log(`playing [${left}|${right}] on the ${action.payload.side}`);
     ModuleState.Module.ccall(
       "populate_move_from_components",
       null,
@@ -83,15 +72,17 @@ startAppListening({
       ["number", "number"],
       [ModuleState.game, move],
     );
-    //printGame(ModuleState.Module, ModuleState.game);
+    printGame(ModuleState.Module, ModuleState.game);
   },
 });
 
 startAppListening({
   actionCreator: pass,
   effect: async (action, listenerApi) => {
-    //console.log("Wasm middleware listened for pass: ", action.payload);
+    console.log("Wasm middleware listened for pass: ", action.payload);
     wasmPass(ModuleState.Module, ModuleState.game);
-    //printGame(ModuleState.Module, ModuleState.game);
+    printGame(ModuleState.Module, ModuleState.game);
   },
 });
+
+console.log("domino ai listener has attached itself!");

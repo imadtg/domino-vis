@@ -34,6 +34,7 @@ type DominoBlockProps<E extends React.ElementType> = Omit<
   dominoGroupId?: string;
   variant?: Variant;
   orientation?: Orientation;
+  reverse?: boolean;
 };
 
 function DominoBlock<E extends React.ElementType = "div">({
@@ -44,6 +45,7 @@ function DominoBlock<E extends React.ElementType = "div">({
   dominoGroupId = "global",
   variant = "default",
   orientation = "vertical",
+  reverse = false,
   ...delegated
 }: DominoBlockProps<E>) {
   const [layoutWidthFr, layoutHeightFr] =
@@ -52,22 +54,25 @@ function DominoBlock<E extends React.ElementType = "div">({
       : [BASE_WIDTH_FR, BASE_HEIGHT_FR];
 
   const aspectRatio = layoutWidthFr / layoutHeightFr;
-  
+
   const [bigPip, smallPip] =
     piece.left > piece.right
       ? [piece.left, piece.right]
       : [piece.right, piece.left];
 
-  const id = `${dominoGroupId}:${bigPip}-${smallPip}`;
+  let rotate = 0;
+  if (bigPip === piece.right) {
+    rotate = congruentInRange(rotate + 180, 360, -180, 180);
+  }
+  if (orientation === "horizontal") {
+    rotate = congruentInRange(rotate - 90, 360, -180, 180);
+  }
+  // even with this, doubles are acting strangely...
+  if (reverse) {
+    rotate = congruentInRange(rotate - 180, 360, -180, 180);
+  }
 
-  const rotate =
-    orientation === "horizontal"
-      ? bigPip === piece.right
-        ? 90
-        : -90
-      : bigPip === piece.right
-        ? 180
-        : 0;
+  const id = `${dominoGroupId}:${bigPip}-${smallPip}:${typeof piece.origin === "undefined" ? "unknown" : piece.origin}-origin`;
   // there is no easier way to persist this for a specific domino piece, keys alone don't work when element changes parent.
   // TODO: try to implement how framer motion persists values like this from their source code.
   const previousRotation = previousRotationMap.get(id) ?? 0;
@@ -103,12 +108,12 @@ function DominoBlock<E extends React.ElementType = "div">({
         <motion.div // i would have used motion.svg directly, but it isn't supported by framer motion.
           initial={false}
           layout="preserve-aspect"
-          layoutId={`${dominoGroupId}:${bigPip}-${smallPip}`}
-          key={`${dominoGroupId}:${bigPip}-${smallPip}`}
+          layoutId={id}
+          key={id}
           animate={{
             rotate: appliedRotation,
           }}
-          onAnimationStart={() =>
+          /*onAnimationStart={() =>
             console.log(
               `started animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`,
             )
@@ -118,7 +123,7 @@ function DominoBlock<E extends React.ElementType = "div">({
             console.log(
               `finished animating rotation of [${bigPip}|${smallPip}]: ${appliedRotation}`,
             )
-          }
+          }*/
           style={{
             transformOrigin: "center",
             width: `${(BASE_WIDTH_FR / layoutWidthFr) * 100}%`,

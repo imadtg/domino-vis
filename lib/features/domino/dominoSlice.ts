@@ -7,7 +7,13 @@ import type {
   SliceSelectors,
 } from "@reduxjs/toolkit";
 import type { DominoPiece, Move, DominoIngameInfo } from "./dominoUtils";
-import { comparePieces, turnAround } from "./dominoUtils";
+import {
+  collapse,
+  comparePieces,
+  getPlayableSides,
+  normalizeMove,
+  turnAround,
+} from "./dominoUtils";
 
 interface PlayingDominoGame {
   gameStatus: "playing";
@@ -25,11 +31,13 @@ const initialState: DominoGame = {
   gameStatus: "uninitialized",
 };
 
-function isUninitialized(state: DominoGame): state is UninitializedDominoGame {
+export function isUninitialized(
+  state: DominoGame,
+): state is UninitializedDominoGame {
   return state.gameStatus === "uninitialized";
 }
 
-function isPlaying(state: DominoGame): state is PlayingDominoGame {
+export function isPlaying(state: DominoGame): state is PlayingDominoGame {
   return state.gameStatus === "playing";
 }
 
@@ -53,67 +61,117 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
         state: DominoGame,
         action: PayloadAction<DominoIngameInfo>,
       ): PlayingDominoGame | undefined => {
+        const gameInfo = collapse(action.payload);
         if (isUninitialized(state)) {
           // Create and return a new state object with the "playing" status
           return {
             gameStatus: "playing",
-            gameInfo: action.payload,
+            gameInfo,
             passCounter: 0,
           } as PlayingDominoGame;
         } else if (isPlaying(state)) {
           // Directly mutate the playing state
-          state.gameInfo = action.payload;
+          state.gameInfo = gameInfo;
         }
       },
     ),
     playMove: create.reducer(
       (state: DominoGame, action: PayloadAction<Move>) => {
         if (!isPlaying(state)) {
-          // Handle the case when the game is not in the "playing" state.
-          // For example, return the state unchanged or throw an error.
           return;
         }
-        // Now TypeScript knows `state` is a `RunningDominoGame`.
-        const index = state.gameInfo.hands[state.gameInfo.turn].findIndex(
-          (piece) => comparePieces(piece, action.payload.piece),
-        );
-        // Continue with the rest of your reducer logic here.
-        state.gameInfo.hands[state.gameInfo.turn].splice(index, 1);
-        if (state.gameInfo.snake.length === 0) {
-          state.gameInfo.snake.push(action.payload.piece);
-        } else {
-          switch (action.payload.side) {
-            case "left": {
-              const leftPip = state.gameInfo.snake[0].left;
-              state.gameInfo.snake.unshift(
-                leftPip === action.payload.piece.right
-                  ? action.payload.piece
-                  : turnAround(action.payload.piece),
-              );
-              break;
-            }
-            case "right": {
-              const rightPip = state.gameInfo.snake.at(-1)?.right;
-              state.gameInfo.snake.push(
-                rightPip === action.payload.piece.left
-                  ? action.payload.piece
-                  : turnAround(action.payload.piece),
-              );
-              break;
-            }
+        [...state.gameInfo.hands, state.gameInfo.boneyard].forEach((hand) => {
+          hand.pieces = hand.pieces.filter(
+            ({ piece }) => !comparePieces(piece, action.payload.piece),
+          );
+        });
+        state.gameInfo.hands[state.gameInfo.turn].count--;
+        state.gameInfo = collapse(state.gameInfo);
+        const { gameInfo } = state;
+        const move = normalizeMove(action.payload, gameInfo.snake);
+        switch (move.side) {
+          case "left": {
+            gameInfo.snake.unshift(move.piece);
+            break;
+          }
+          case "right": {
+            gameInfo.snake.push(move.piece);
+            break;
           }
         }
         state.passCounter = 0;
-        state.gameInfo.turn = (state.gameInfo.turn + 1) % 2;
+        gameInfo.turn = (gameInfo.turn + 1) % 2; // HACK: hardcoded for two players for now
       },
     ),
     pass: create.reducer((state: DominoGame) => {
-      if (state.gameStatus !== "playing") {
+      // TODO: move this first part into a separate action of 'absenting', this would make it hard to synchronize the wasm listener middleware though...
+      if (!isPlaying(state)) {
         return;
       }
+      state.gameInfo.hands[state.gameInfo.turn].pieces = state.gameInfo.hands[
+        state.gameInfo.turn
+      ].pieces.filter(
+        ({ piece }) =>
+          getPlayableSides(state.gameInfo.snake, piece).length === 0,
+      );
+      state.gameInfo = collapse(state.gameInfo);
       state.gameInfo.turn = (state.gameInfo.turn + 1) % 2;
       state.passCounter++;
     }),
+    perfectPick: create.reducer(
+      (state: DominoGame, action: PayloadAction<DominoPiece>) => {
+        if (!isPlaying(state)) {
+          return;
+        }
+        state.gameInfo.hands[state.gameInfo.turn].pieces = state.gameInfo.hands[
+          state.gameInfo.turn
+        ].pieces.filter(
+          ({ piece }) =>
+            getPlayableSides(state.gameInfo.snake, piece).length === 0,
+        );
+        state.gameInfo.boneyard.pieces = state.gameInfo.boneyard.pieces.filter(
+          ({ piece }) => !comparePieces(piece, action.payload),
+        );
+        state.gameInfo.hands[state.gameInfo.turn].pieces.push({
+          piece: { ...action.payload, origin: "boneyard" }, // to ensure that the animations work, we wont consider action.payload's origin, which should already be 'boneyard' in the regular circumstances... just in case somehow it comes in undefined or wrong...
+          presence: "certain",
+        });
+        state.gameInfo = collapse(state.gameInfo);
+      },
+    ),
+    imperfectPick: create.reducer(
+      (state: DominoGame, action: PayloadAction<number>) => {
+        if (!isPlaying(state)) {
+          return;
+        }
+        state.gameInfo.hands[state.gameInfo.turn].pieces = state.gameInfo.hands[
+          state.gameInfo.turn
+        ].pieces.filter(
+          ({ piece }) =>
+            getPlayableSides(state.gameInfo.snake, piece).length === 0,
+        );
+
+        state.gameInfo.boneyard.count -= action.payload;
+        state.gameInfo.hands[state.gameInfo.turn].count += action.payload;
+        const pickableBoneyardPieces = state.gameInfo.boneyard.pieces
+          .map(({ piece }) => piece)
+          .filter(
+            (piece) =>
+              getPlayableSides(state.gameInfo.snake, piece).length === 0 && // only pieces that cant be played because that is the definition of an imperfect pick, a pick which is not revealed, a playable pick is played immediately and thus should be a perfect pick
+              !state.gameInfo.hands[state.gameInfo.turn].pieces.some(
+                ({ piece: handPiece }) => comparePieces(piece, handPiece),
+              ),
+          );
+
+        state.gameInfo.hands[state.gameInfo.turn].pieces = state.gameInfo.hands[state.gameInfo.turn].pieces.concat(
+          pickableBoneyardPieces.map((piece) => ({
+            piece,
+            presence: "possible",
+          })),
+        );
+        state.gameInfo = collapse(state.gameInfo);
+      },
+    ),
   }),
   selectors: {
     selectHands: (state) =>
@@ -126,13 +184,11 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
       state.gameStatus === "playing" ? state.passCounter >= 2 : undefined,
     selectStatus: (state) => state.gameStatus,
     selectGameInfo: (state) =>
-      state.gameStatus === "playing"
-        ? state.gameInfo
-        : undefined,
+      state.gameStatus === "playing" ? state.gameInfo : undefined,
   },
 });
 
-export const { initialize, playMove, pass } = dominoSlice.actions;
+export const { initialize, playMove, pass, perfectPick, imperfectPick } = dominoSlice.actions;
 
 export const {
   selectHands,

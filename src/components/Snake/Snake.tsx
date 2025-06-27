@@ -494,10 +494,9 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
               key={`${piece.left}-${piece.right}`}
             >
               <DominoBlock
-                piece={
-                  direction === "row" || direction === "column"
-                    ? piece
-                    : turnAround(piece) // turn the piece around as the flow is reversed.
+                piece={piece}
+                reverse={
+                  direction === "row-reverse" || direction === "column-reverse"
                 }
                 orientation={orientation}
                 className="block"
