@@ -211,6 +211,7 @@ function ImperfectPicker({ onImperfectPick }: ImperfectPickerProps) {
             setImperfectPickAmount(parseInt(event.target.value))
           }
           required={true}
+          min="1"
         />
         <Button>Imperfect pick</Button>
       </fieldset>
