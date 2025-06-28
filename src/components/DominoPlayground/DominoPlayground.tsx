@@ -60,6 +60,13 @@ export default function DominoPlayground() {
             if (boneyard.count === 0) {
               dispatch(pass());
             } else if (
+              boneyard.count === 1 &&
+              boneyard.pieces.length === 1 &&
+              boneyard.pieces[0].presence === "certain"
+            ) {
+              // this means there is only one piece left in the boneyard, just perfect pick it (btw only the boneyard.pieces.length === 1 clause is necessary, the rest are just a sanity check)
+              dispatch(perfectPick(boneyard.pieces[0].piece));
+            } else if (
               boneyard.pieces.every(
                 ({ piece }) => getPlayableSides(snake, piece).length === 0,
               ) &&

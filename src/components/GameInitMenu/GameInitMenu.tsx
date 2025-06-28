@@ -41,7 +41,7 @@ const INITIAL_GAME_INFO: Record<Gamemode, DominoIngameInfo> = {
 };
 
 // the ID of the player using the GUI against the opponent, the goal of this entire GUI being an AI assistant to this player
-export const USER = 1;
+export const USER = 1; // TODO: move this and OPPONENT constants into a dedicated constants file or dominoUtils.ts
 
 function GameInitMenu({ gamemode }: GameInitMenuProps) {
   const dispatch = useAppDispatch();
