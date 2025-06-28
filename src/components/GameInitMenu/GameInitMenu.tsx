@@ -40,7 +40,8 @@ const INITIAL_GAME_INFO: Record<Gamemode, DominoIngameInfo> = {
   },
 };
 
-const PLAYER = 1; // the ID of the player using the GUI against the opponent, the goal of this entire GUI being an AI assistant to this player
+// the ID of the player using the GUI against the opponent, the goal of this entire GUI being an AI assistant to this player
+export const USER = 1;
 
 function GameInitMenu({ gamemode }: GameInitMenuProps) {
   const dispatch = useAppDispatch();
@@ -51,12 +52,12 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
   function handleSubmit(event: React.SyntheticEvent) {
     event.preventDefault();
     if (
-      initialGameInfo.hands[PLAYER].pieces.length !==
-      initialGameInfo.hands[PLAYER].count
+      initialGameInfo.hands[USER].pieces.length !==
+      initialGameInfo.hands[USER].count
     ) {
       window.alert(
-        `Please select ${initialGameInfo.hands[PLAYER].count} domino pieces!
-        (You selected only ${initialGameInfo.hands[PLAYER].pieces.length}!)`,
+        `Please select ${initialGameInfo.hands[USER].count} domino pieces!
+        (You selected only ${initialGameInfo.hands[USER].pieces.length}!)`,
       );
       return;
     }
@@ -70,29 +71,27 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
   ) {
     if (event.currentTarget.checked) {
       if (
-        initialGameInfo.hands[PLAYER].pieces.length >=
-        initialGameInfo.hands[PLAYER].count
+        initialGameInfo.hands[USER].pieces.length >=
+        initialGameInfo.hands[USER].count
       ) {
         window.alert(
-          `You can't select more than ${initialGameInfo.hands[PLAYER].count} domino pieces!
+          `You can't select more than ${initialGameInfo.hands[USER].count} domino pieces!
           (Unselect another domino piece then try again!)`,
         );
         return;
       }
       setInitialGameInfo(
         produce(initialGameInfo, (oldGameInfo) => {
-          oldGameInfo.hands[PLAYER].pieces.push({ piece, presence: "certain" });
+          oldGameInfo.hands[USER].pieces.push({ piece, presence: "certain" });
         }),
       );
     } else {
       setInitialGameInfo(
         produce(initialGameInfo, (oldGameInfo) => {
-          const piecesWithoutDeselected = oldGameInfo.hands[
-            PLAYER
-          ].pieces.filter(
+          const piecesWithoutDeselected = oldGameInfo.hands[USER].pieces.filter(
             ({ piece: pieceOfHand }) => !comparePieces(piece, pieceOfHand),
           );
-          oldGameInfo.hands[PLAYER].pieces = piecesWithoutDeselected;
+          oldGameInfo.hands[USER].pieces = piecesWithoutDeselected;
         }),
       );
     }
@@ -104,18 +103,18 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
     const dominoes = getAllDominoes();
     const remainingDominoes = dominoes.filter(
       (piece) =>
-        !gameInfo.hands[PLAYER].pieces.some(({ piece: selectedPiece }) =>
+        !gameInfo.hands[USER].pieces.some(({ piece: selectedPiece }) =>
           comparePieces(piece, selectedPiece),
         ),
     );
     return produce(gameInfo, (oldGameInfo) => {
       const otherHands = [
-        ...oldGameInfo.hands.filter((hand, index) => index !== PLAYER),
+        ...oldGameInfo.hands.filter((hand, index) => index !== USER),
         oldGameInfo.boneyard,
       ];
       otherHands.forEach((hand) => {
         hand.pieces = remainingDominoes.map((piece) => ({
-          piece: {...piece}, // make a shallow copy to differentiate pieces of different hands
+          piece: { ...piece }, // make a shallow copy to differentiate pieces of different hands
           presence: "possible",
         }));
       });
@@ -136,13 +135,13 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
     >
       <fieldset className="flex flex-col justify-items-center gap-y-[16px]">
         <legend>
-          Select {initialGameInfo.hands[PLAYER].count} domino pieces for your
+          Select {initialGameInfo.hands[USER].count} domino pieces for your
           hand:
         </legend>
         <div className="grid grid-cols-4 grid-rows-7 gap-[16px] p-[1em] landscape:grid-cols-7 landscape:grid-rows-4">
           {getAllDominoes().map((piece) => {
             const pieceId = `${id}-${piece.left}-${piece.right}`;
-            const checked = initialGameInfo.hands[PLAYER].pieces.some(
+            const checked = initialGameInfo.hands[USER].pieces.some(
               ({ piece: pieceOfHand }) => comparePieces(piece, pieceOfHand),
             );
             return (
@@ -172,12 +171,12 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
       </fieldset>
       <fieldset>
         <legend>Select starting player:</legend>
-        <label htmlFor={`${id}-${PLAYER}`}>You</label>
+        <label htmlFor={`${id}-${USER}`}>You</label>
         <input
-          id={`${id}-${PLAYER}`}
+          id={`${id}-${USER}`}
           type="radio"
-          value={PLAYER}
-          checked={initialGameInfo.turn === PLAYER}
+          value={USER}
+          checked={initialGameInfo.turn === USER}
           onChange={(event) => {
             setInitialGameInfo(
               produce(initialGameInfo, (oldGameInfo) => {
@@ -186,12 +185,12 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
             );
           }}
         />
-        <label htmlFor={`${id}-${(PLAYER + 1) % 2}`}>Opponent</label>
+        <label htmlFor={`${id}-${(USER + 1) % 2}`}>Opponent</label>
         <input
-          id={`${id}-${(PLAYER + 1) % 2}`}
+          id={`${id}-${(USER + 1) % 2}`}
           type="radio"
-          value={(PLAYER + 1) % 2}
-          checked={initialGameInfo.turn === (PLAYER + 1) % 2}
+          value={(USER + 1) % 2}
+          checked={initialGameInfo.turn === (USER + 1) % 2}
           onChange={(event) => {
             setInitialGameInfo(
               produce(initialGameInfo, (oldGameInfo) => {

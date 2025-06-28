@@ -42,7 +42,7 @@ export function isPlaying(state: DominoGame): state is PlayingDominoGame {
 }
 
 const partialGenericCreateAppSlice = <T>() => {
-  // this is absolute pain. this could break on RTK update, there has to be a better way...
+  // HACK: this is absolute pain. this could break on RTK update, there has to be a better way to fix types than this...
   return <
     U extends SliceCaseReducers<T>,
     V extends string,
