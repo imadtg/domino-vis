@@ -20,17 +20,14 @@ import {
 import Snake from "@/src/components/Snake";
 import Hand from "@/src/components/Hand";
 import Button from "../Button";
+import { USER } from "../GameInitMenu";
 
 function DominoTable() {
   const dispatch = useAppDispatch();
   const gameInfo = useAppSelector(selectGameInfo);
   // TODO: add passing UI and endgame UI
-  const isBlocked = useAppSelector(selectIsBlocked);
   const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
   const [boneyardIsShown, setBoneyardIsShown] = React.useState<boolean>(false);
-  const [imperfectPickAmount, setImperfectPickAmount] =
-    React.useState<number>(0); // TODO: move these and their form into another component
-  const id = React.useId();
 
   if (typeof gameInfo === "undefined") {
     return;
@@ -38,8 +35,22 @@ function DominoTable() {
 
   const { turn, hands, snake, boneyard } = gameInfo;
 
-  const firstPlayer = 0;
-  const secondPlayer = 1;
+  const OPPONENT = (USER + 1) % 2; // hardcoded for two players for now
+
+  const boneyardIsPickable = boneyard.count > 0 && snake.length > 0;
+
+  const canPickFromBoneyard =
+    boneyardIsPickable &&
+    !hands[turn].pieces.some(
+      ({ piece, presence }) =>
+        presence === "certain" && getPlayableSides(snake, piece).length > 0,
+    );
+
+  const mustPickFromBoneyard =
+    boneyardIsPickable &&
+    hands[turn].pieces.every(
+      ({ piece }) => getPlayableSides(snake, piece).length === 0,
+    );
 
   function handlePlayChosenPiece(side: "left" | "right") {
     if (!chosenPiece) {
@@ -50,6 +61,7 @@ function DominoTable() {
   }
 
   function handleClickPiece(piece: DominoPiece) {
+    setBoneyardIsShown(false); // upon clicking a piece, hide the boneyard
     // TODO: check if the piece is in the hand of the player whose turn it is.
     setChosenPiece(undefined);
     if (
@@ -74,27 +86,15 @@ function DominoTable() {
     // automatically play domino if there is only one side for it to be played in
     // TODO: allow for the player to choose this side somehow to have the same orientation as the board IRL, perhaps through detecting whether the player clicks on the right or left of the piece using raw click event data
     // but for this to be consistent, we should inflate clickboxes, and have adequate feedback that the side on which you click matters
-    dispatch(playMove({ piece, side: sides[0] })); 
-  }
-
-  function handlePerfectPick(piece: DominoPiece) {
-    dispatch(perfectPick(piece));
-  }
-
-  // TODO: have a better UX guide on what imperfect picks are and how they should be done? this can be done in person for now...
-  // TODO: fix all remaining any types in the codebase
-  function handleImperfectPickSubmit(event: any) {
-    event.preventDefault();
-    dispatch(imperfectPick(imperfectPickAmount));
-    setImperfectPickAmount(0);
+    dispatch(playMove({ piece, side: sides[0] }));
   }
 
   return (
     <div className="relative flex h-full flex-col items-center">
       <Hand
-        hand={hands[firstPlayer]}
+        hand={hands[OPPONENT]}
         onPieceClick={(piece) =>
-          turn == firstPlayer && getPlayableSides(snake, piece).length > 0
+          turn == OPPONENT && getPlayableSides(snake, piece).length > 0
             ? () => handleClickPiece(piece)
             : undefined
         }
@@ -106,51 +106,115 @@ function DominoTable() {
         />
       </div>
       <Hand
-        hand={hands[secondPlayer]}
+        hand={hands[USER]}
         onPieceClick={(piece) =>
-          turn == secondPlayer && getPlayableSides(snake, piece).length > 0
+          turn == USER && getPlayableSides(snake, piece).length > 0
             ? () => handleClickPiece(piece)
             : undefined
         }
       />
-      <Button
-        className="absolute left-0"
-        onClick={() => setBoneyardIsShown(!boneyardIsShown)}
-      >
-        toggle boneyard
-      </Button>
-      {boneyardIsShown && (
-        <div className="absolute inset-20 grid place-content-center gap-4">
-          <Hand
-            hand={boneyard}
-            onPieceClick={(piece) => () => handlePerfectPick(piece)}
-          />
-          <form onSubmit={handleImperfectPickSubmit}>
-            <fieldset className="flex flex-col gap-[8px] p-[8px]">
-              <legend>
-                Unrevealed Dominoes Picker (does not include the last one that
-                is to be played){" "}
-                {/* TODO: have a better explanation of what this is... */}
-              </legend>
-              <label htmlFor={`${id}-depth`}>
-                Amount of unrevealed dominoes picked
-              </label>
-              <input
-                id={`${id}-depth`}
-                type="text"
-                value={imperfectPickAmount}
-                onChange={(event) =>
-                  setImperfectPickAmount(parseInt(event.target.value))
+      {canPickFromBoneyard && (
+        <>
+          {!mustPickFromBoneyard && (
+            <Button
+              className="absolute left-0"
+              onClick={() => setBoneyardIsShown(!boneyardIsShown)}
+            >
+              toggle boneyard
+            </Button>
+          )}
+          {(boneyardIsShown || mustPickFromBoneyard) && (
+            <div className="absolute inset-20 grid place-content-center gap-4">
+              <Boneyard
+                key={
+                  `turn-${turn}` /* this is so that state variables get reset when passing the turn (relevant for the hasImperfectPicked state variable) */
                 }
-                placeholder="3"
-                pattern="[1-9][0-9]*"
               />
-              <Button>Imperfect pick</Button>
-            </fieldset>
-          </form>
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
+  );
+}
+
+// TODO: move this and ImperfectPicker into their own component files
+function Boneyard() {
+  // we will assume this is only rendered when the player can actually pick from the boneyard
+  const dispatch = useAppDispatch();
+  const gameInfo = useAppSelector(selectGameInfo);
+  const [hasImperfectPicked, setHasImperfectPicked] =
+    React.useState<boolean>(false); // this will get reset by the change of key in DominoTable
+
+  if (typeof gameInfo === "undefined") {
+    return;
+  }
+
+  const { turn, snake, boneyard } = gameInfo;
+
+  const canImperfectPick = boneyard.pieces.some(
+    ({ piece }) => getPlayableSides(snake, piece).length === 0,
+  );
+
+  function handlePerfectPick(piece: DominoPiece) {
+    dispatch(perfectPick(piece));
+  }
+
+  function handleImperfectPick(amount: number) {
+    dispatch(imperfectPick(amount));
+    setHasImperfectPicked(true);
+  }
+
+  return turn !== USER && canImperfectPick && !hasImperfectPicked ? (
+    <ImperfectPicker onImperfectPick={handleImperfectPick} />
+  ) : (
+    <Hand
+      hand={boneyard}
+      onPieceClick={(piece) => () => handlePerfectPick(piece)}
+    />
+  );
+}
+
+interface ImperfectPickerProps {
+  onImperfectPick: (amount: number) => void;
+}
+
+function ImperfectPicker({ onImperfectPick }: ImperfectPickerProps) {
+  // we will assume this is only rendered when the player can actually do imperfect picks
+  const [imperfectPickAmount, setImperfectPickAmount] =
+    React.useState<string>("");
+  const id = React.useId();
+
+  // TODO: have a better UX guide on what imperfect picks are and how they should be done? this can be done in person for now...
+  // TODO: fix all remaining any types in the codebase
+  function handleImperfectPickSubmit(event: any) {
+    event.preventDefault();
+    onImperfectPick(parseInt(imperfectPickAmount));
+    setImperfectPickAmount("");
+  }
+
+  return (
+    <form className="w-fit" onSubmit={handleImperfectPickSubmit}>
+      <fieldset className="flex flex-col gap-[8px] p-[8px]">
+        <legend>
+          Unrevealed dominoes picker from the Boneyard  {/* TODO: have a better explanation of what this is... */}
+        </legend>
+        <label htmlFor={`${id}-imperfect-pick`}>
+          Amount of unrevealed dominoes picked from the boneyard (does not include the last one that is to
+          be played)
+        </label>
+        <input
+          id={`${id}-imperfect-pick`}
+          type="number"
+          value={imperfectPickAmount}
+          onChange={(event) => setImperfectPickAmount(event.target.value)}
+          required={true}
+          min="1"
+          placeholder="1"
+        />
+        <Button>Pick from the boneyard</Button>
+      </fieldset>
+    </form>
   );
 }
 

@@ -8,13 +8,20 @@ import Button from "../Button";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { addAppListener } from "@/lib/listenerMiddleware";
 import { isAnyOf } from "@reduxjs/toolkit";
-import { playMove, pass, initialize } from "@/lib/features/domino/dominoSlice";
+import {
+  playMove,
+  pass,
+  initialize,
+  perfectPick,
+  imperfectPick,
+} from "@/lib/features/domino/dominoSlice";
 import {
   selectGameInfo,
   selectIsBlocked,
 } from "@/lib/features/domino/dominoSlice";
 import { getPlayableSides } from "@/lib/features/domino/dominoUtils";
 //import "../DominoAiMenu/dominoWasmStore";
+import { USER } from "@/src/components/GameInitMenu";
 
 export type Gamemode = "14/14" | "7/7";
 
@@ -27,10 +34,15 @@ export default function DominoPlayground() {
   // After more thought, this is a good default because the purpose of this entire App is to be a GUI to a domino ai, not a multiplayer game, thats another rabbit hole (hint: P2P)
   // but visible feedback is still welcome...
   React.useEffect(() => {
-    console.log("now we are using a dispatch for autopass"); // debug print to see if this closure's dispatch is stale (in comparison to domino ai store listener changing it)
     const unsubscribe = dispatch(
       addAppListener({
-        matcher: isAnyOf(playMove, pass, initialize),
+        matcher: isAnyOf(
+          playMove,
+          pass,
+          initialize,
+          perfectPick,
+          imperfectPick,
+        ),
         effect: async (action, listenerApi) => {
           const { dominoGame } = listenerApi.getState();
           const gameInfo = selectGameInfo.unwrapped(dominoGame);
@@ -38,14 +50,31 @@ export default function DominoPlayground() {
             return;
           }
           const isBlocked = selectIsBlocked.unwrapped(dominoGame);
-          const { turn, hands, snake } = gameInfo;
+          const { turn, hands, snake, boneyard } = gameInfo;
           if (
             hands[turn].pieces.every(
               ({ piece }) => getPlayableSides(snake, piece).length === 0,
             ) &&
             !isBlocked
           ) {
-            dispatch(pass());
+            if (boneyard.count === 0) {
+              dispatch(pass());
+            } else if (
+              boneyard.count === 1 &&
+              boneyard.pieces.length === 1 &&
+              boneyard.pieces[0].presence === "certain"
+            ) {
+              // this means there is only one piece left in the boneyard, just perfect pick it (btw only the boneyard.pieces.length === 1 clause is necessary, the rest are just a sanity check)
+              dispatch(perfectPick(boneyard.pieces[0].piece));
+            } else if (
+              boneyard.pieces.every(
+                ({ piece }) => getPlayableSides(snake, piece).length === 0,
+              ) &&
+              (turn !== USER ||
+                boneyard.pieces.every(({ presence }) => presence === "certain")) // this is a guard safe so that we dont pick the entirety of the boneyard before knowing what is in it in the turn of the user
+            ) {
+              dispatch(imperfectPick(boneyard.count));
+            }
           }
         },
       }),
