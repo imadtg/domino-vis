@@ -37,7 +37,7 @@ function DominoTable() {
 
   const OPPONENT = (USER + 1) % 2; // hardcoded for two players for now
 
-  const boneyardIsPickable = boneyard.count > 0;
+  const boneyardIsPickable = boneyard.count > 0 && snake.length > 0;
 
   const canPickFromBoneyard =
     boneyardIsPickable &&
@@ -182,38 +182,37 @@ interface ImperfectPickerProps {
 function ImperfectPicker({ onImperfectPick }: ImperfectPickerProps) {
   // we will assume this is only rendered when the player can actually do imperfect picks
   const [imperfectPickAmount, setImperfectPickAmount] =
-    React.useState<number>(0);
+    React.useState<string>("");
   const id = React.useId();
 
   // TODO: have a better UX guide on what imperfect picks are and how they should be done? this can be done in person for now...
   // TODO: fix all remaining any types in the codebase
   function handleImperfectPickSubmit(event: any) {
     event.preventDefault();
-    onImperfectPick(imperfectPickAmount);
-    setImperfectPickAmount(0);
+    onImperfectPick(parseInt(imperfectPickAmount));
+    setImperfectPickAmount("");
   }
 
   return (
     <form className="w-fit" onSubmit={handleImperfectPickSubmit}>
       <fieldset className="flex flex-col gap-[8px] p-[8px]">
         <legend>
-          Unrevealed Dominoes Picker (does not include the last one that is to
-          be played) {/* TODO: have a better explanation of what this is... */}
+          Unrevealed dominoes picker from the Boneyard  {/* TODO: have a better explanation of what this is... */}
         </legend>
         <label htmlFor={`${id}-imperfect-pick`}>
-          Amount of unrevealed dominoes picked
+          Amount of unrevealed dominoes picked from the boneyard (does not include the last one that is to
+          be played)
         </label>
         <input
           id={`${id}-imperfect-pick`}
           type="number"
           value={imperfectPickAmount}
-          onChange={(event) =>
-            setImperfectPickAmount(parseInt(event.target.value))
-          }
+          onChange={(event) => setImperfectPickAmount(event.target.value)}
           required={true}
           min="1"
+          placeholder="1"
         />
-        <Button>Imperfect pick</Button>
+        <Button>Pick from the boneyard</Button>
       </fieldset>
     </form>
   );
