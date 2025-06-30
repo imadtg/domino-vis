@@ -1,6 +1,5 @@
 import { USER } from "@/src/components/GameInitMenu";
 import { produce } from "immer";
-import next from "next";
 import posthog from "posthog-js";
 
 export interface DominoPiece {
