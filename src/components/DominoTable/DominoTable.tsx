@@ -8,6 +8,7 @@ import {
   playMove,
   selectGameInfo,
   selectIsBlocked,
+  selectIsOver,
 } from "@/lib/features/domino/dominoSlice";
 
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
@@ -25,6 +26,7 @@ import { USER } from "../GameInitMenu";
 function DominoTable() {
   const dispatch = useAppDispatch();
   const gameInfo = useAppSelector(selectGameInfo);
+  const isOver = useAppSelector(selectIsOver);
   // TODO: add passing UI and endgame UI
   const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
   const [boneyardIsShown, setBoneyardIsShown] = React.useState<boolean>(false);
@@ -37,7 +39,8 @@ function DominoTable() {
 
   const OPPONENT = (USER + 1) % 2; // hardcoded for two players for now
 
-  const boneyardIsPickable = boneyard.count > 0 && snake.length > 0;
+  // TODO: move these into selectors?
+  const boneyardIsPickable = boneyard.count > 0 && snake.length > 0 && !isOver;
 
   const canPickFromBoneyard =
     boneyardIsPickable &&
