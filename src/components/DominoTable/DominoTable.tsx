@@ -97,7 +97,7 @@ function DominoTable() {
       <Hand
         hand={hands[OPPONENT]}
         onPieceClick={(piece) =>
-          turn == OPPONENT && getPlayableSides(snake, piece).length > 0
+          !isOver && turn == OPPONENT && getPlayableSides(snake, piece).length > 0
             ? () => handleClickPiece(piece)
             : undefined
         }
@@ -111,7 +111,7 @@ function DominoTable() {
       <Hand
         hand={hands[USER]}
         onPieceClick={(piece) =>
-          turn == USER && getPlayableSides(snake, piece).length > 0
+          !isOver && turn == USER && getPlayableSides(snake, piece).length > 0
             ? () => handleClickPiece(piece)
             : undefined
         }
