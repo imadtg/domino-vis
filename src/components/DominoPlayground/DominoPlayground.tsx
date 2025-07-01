@@ -23,7 +23,7 @@ import {
 import { getPlayableSides } from "@/lib/features/domino/dominoUtils";
 //import "../DominoAiMenu/dominoWasmStore";
 import { USER } from "@/src/components/GameInitMenu";
-import posthog, { PostHog } from "posthog-js";
+import posthog from "posthog-js";
 import GameOverMenu from "../GameOverMenu";
 
 export type Gamemode = "14/14" | "7/7";
