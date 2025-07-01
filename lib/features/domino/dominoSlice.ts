@@ -142,6 +142,7 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
         if (!isPlaying(state)) {
           return;
         }
+        state.gameInfo.boneyard.count--;
         [...state.gameInfo.hands, state.gameInfo.boneyard].forEach((hand) => {
           hand.pieces = hand.pieces.filter(
             ({ piece }) => !comparePieces(piece, action.payload),
@@ -153,6 +154,7 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
           ({ piece }) =>
             getPlayableSides(state.gameInfo.snake, piece).length === 0,
         ); // remove all playable pieces from the current player's hand (because otherwise they wouldnt have picked)
+        state.gameInfo.hands[state.gameInfo.turn].count++;
         state.gameInfo.hands[state.gameInfo.turn].pieces.push({
           piece: { ...action.payload, origin: "boneyard" }, // to ensure that the animations work, we wont consider action.payload's origin, which should already be 'boneyard' in the regular circumstances... just in case somehow it comes in undefined or wrong...
           presence: "certain",
