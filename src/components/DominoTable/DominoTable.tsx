@@ -97,7 +97,9 @@ function DominoTable() {
       <Hand
         hand={hands[OPPONENT]}
         onPieceClick={(piece) =>
-          !isOver && turn == OPPONENT && getPlayableSides(snake, piece).length > 0
+          !isOver &&
+          turn == OPPONENT &&
+          getPlayableSides(snake, piece).length > 0
             ? () => handleClickPiece(piece)
             : undefined
         }
@@ -159,6 +161,10 @@ function Boneyard() {
     ({ piece }) => getPlayableSides(snake, piece).length === 0,
   );
 
+  // this essentially means that the only unplayable perfect (ie revealed) picks are those of the user as he sees them
+  // opponents can only reveal a pick by playing it immediately!
+  const canPerfectPickUnplayables = turn === USER;
+
   function handlePerfectPick(piece: DominoPiece) {
     dispatch(perfectPick(piece));
   }
@@ -173,7 +179,11 @@ function Boneyard() {
   ) : (
     <Hand
       hand={boneyard}
-      onPieceClick={(piece) => () => handlePerfectPick(piece)}
+      onPieceClick={(piece) =>
+        getPlayableSides(snake, piece).length > 0 || canPerfectPickUnplayables
+          ? () => handlePerfectPick(piece)
+          : undefined
+      }
     />
   );
 }
@@ -199,11 +209,12 @@ function ImperfectPicker({ onImperfectPick }: ImperfectPickerProps) {
     <form className="w-fit" onSubmit={handleImperfectPickSubmit}>
       <fieldset className="flex flex-col gap-[8px] p-[8px]">
         <legend>
-          Unrevealed dominoes picker from the Boneyard  {/* TODO: have a better explanation of what this is... */}
+          Unrevealed dominoes picker from the Boneyard{" "}
+          {/* TODO: have a better explanation of what this is... */}
         </legend>
         <label htmlFor={`${id}-imperfect-pick`}>
-          Amount of unrevealed dominoes picked from the boneyard (does not include the last one that is to
-          be played)
+          Amount of unrevealed dominoes picked from the boneyard (does not
+          include the last one that is to be played)
         </label>
         <input
           id={`${id}-imperfect-pick`}
