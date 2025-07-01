@@ -57,6 +57,13 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
   name: "dominoGame",
   initialState,
   reducers: (create) => ({
+    reset: create.reducer((state: DominoGame): DominoGame => {
+      posthog.capture("game reset", {
+        stateBefore: state,
+        stateAfter: initialState,
+      });
+      return initialState;
+    }),
     initialize: create.reducer(
       (
         state: DominoGame,
@@ -220,14 +227,19 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
     selectTurn: (state) =>
       state.gameStatus === "playing" ? state.gameInfo.turn : undefined,
     selectIsBlocked: (state) =>
-      state.gameStatus === "playing" ? state.passCounter >= 2 : undefined,
+      state.gameStatus === "playing" ? state.passCounter >= 2 : undefined, // HACK: this is hardcoded for two players.
+    selectIsOver: (state) =>
+      state.gameStatus === "playing"
+        ? state.passCounter >= 2 ||
+          state.gameInfo.hands.some((hand) => hand.count === 0)
+        : undefined,
     selectStatus: (state) => state.gameStatus,
     selectGameInfo: (state) =>
       state.gameStatus === "playing" ? state.gameInfo : undefined,
   },
 });
 
-export const { initialize, playMove, pass, perfectPick, imperfectPick } =
+export const { reset, initialize, playMove, pass, perfectPick, imperfectPick } =
   dominoSlice.actions;
 
 export const {
@@ -236,5 +248,6 @@ export const {
   selectTurn,
   selectStatus,
   selectIsBlocked,
+  selectIsOver,
   selectGameInfo,
 } = dominoSlice.selectors;

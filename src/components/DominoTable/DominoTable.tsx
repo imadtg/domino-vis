@@ -8,6 +8,7 @@ import {
   playMove,
   selectGameInfo,
   selectIsBlocked,
+  selectIsOver,
 } from "@/lib/features/domino/dominoSlice";
 
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
@@ -25,6 +26,7 @@ import { USER } from "../GameInitMenu";
 function DominoTable() {
   const dispatch = useAppDispatch();
   const gameInfo = useAppSelector(selectGameInfo);
+  const isOver = useAppSelector(selectIsOver);
   // TODO: add passing UI and endgame UI
   const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
   const [boneyardIsShown, setBoneyardIsShown] = React.useState<boolean>(false);
@@ -37,7 +39,8 @@ function DominoTable() {
 
   const OPPONENT = (USER + 1) % 2; // hardcoded for two players for now
 
-  const boneyardIsPickable = boneyard.count > 0 && snake.length > 0;
+  // TODO: move these into selectors?
+  const boneyardIsPickable = boneyard.count > 0 && snake.length > 0 && !isOver;
 
   const canPickFromBoneyard =
     boneyardIsPickable &&
@@ -94,7 +97,7 @@ function DominoTable() {
       <Hand
         hand={hands[OPPONENT]}
         onPieceClick={(piece) =>
-          turn == OPPONENT && getPlayableSides(snake, piece).length > 0
+          !isOver && turn == OPPONENT && getPlayableSides(snake, piece).length > 0
             ? () => handleClickPiece(piece)
             : undefined
         }
@@ -108,7 +111,7 @@ function DominoTable() {
       <Hand
         hand={hands[USER]}
         onPieceClick={(piece) =>
-          turn == USER && getPlayableSides(snake, piece).length > 0
+          !isOver && turn == USER && getPlayableSides(snake, piece).length > 0
             ? () => handleClickPiece(piece)
             : undefined
         }
@@ -186,8 +189,7 @@ function ImperfectPicker({ onImperfectPick }: ImperfectPickerProps) {
   const id = React.useId();
 
   // TODO: have a better UX guide on what imperfect picks are and how they should be done? this can be done in person for now...
-  // TODO: fix all remaining any types in the codebase
-  function handleImperfectPickSubmit(event: any) {
+  function handleImperfectPickSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onImperfectPick(parseInt(imperfectPickAmount));
     setImperfectPickAmount("");
