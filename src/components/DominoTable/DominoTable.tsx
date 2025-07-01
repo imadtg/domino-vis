@@ -189,8 +189,7 @@ function ImperfectPicker({ onImperfectPick }: ImperfectPickerProps) {
   const id = React.useId();
 
   // TODO: have a better UX guide on what imperfect picks are and how they should be done? this can be done in person for now...
-  // TODO: fix all remaining any types in the codebase
-  function handleImperfectPickSubmit(event: any) {
+  function handleImperfectPickSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onImperfectPick(parseInt(imperfectPickAmount));
     setImperfectPickAmount("");

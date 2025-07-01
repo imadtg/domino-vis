@@ -16,7 +16,7 @@ interface GameOverMenuProps {
 function GameOverMenu({ className, onReset }: GameOverMenuProps) {
   const dispatch = useAppDispatch();
 
-  function submitGameReset(event: any) {
+  function submitGameReset(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onReset?.();
     dispatch(reset());
