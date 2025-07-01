@@ -22,6 +22,7 @@ import {
 import { getPlayableSides } from "@/lib/features/domino/dominoUtils";
 //import "../DominoAiMenu/dominoWasmStore";
 import { USER } from "@/src/components/GameInitMenu";
+import posthog from "posthog-js";
 
 export type Gamemode = "14/14" | "7/7";
 
@@ -58,6 +59,9 @@ export default function DominoPlayground() {
             !isBlocked
           ) {
             if (boneyard.count === 0) {
+              posthog.capture("auto-pass happened", {
+                gameInfoBefore: gameInfo,
+              });
               dispatch(pass());
             } else if (
               boneyard.count === 1 &&
@@ -65,6 +69,10 @@ export default function DominoPlayground() {
               boneyard.pieces[0].presence === "certain"
             ) {
               // this means there is only one piece left in the boneyard, just perfect pick it (btw only the boneyard.pieces.length === 1 clause is necessary, the rest are just a sanity check)
+              posthog.capture("auto-perfect-pick happened", {
+                gameInfoBefore: gameInfo,
+                piece: boneyard.pieces[0].piece,
+              });
               dispatch(perfectPick(boneyard.pieces[0].piece));
             } else if (
               boneyard.pieces.every(
@@ -73,6 +81,10 @@ export default function DominoPlayground() {
               (turn !== USER ||
                 boneyard.pieces.every(({ presence }) => presence === "certain")) // this is a guard safe so that we dont pick the entirety of the boneyard before knowing what is in it in the turn of the user
             ) {
+              posthog.capture("auto-imperfect-pick happened", {
+                gameInfoBefore: gameInfo,
+                amount: boneyard.count,
+              });
               dispatch(imperfectPick(boneyard.count));
             }
           }
