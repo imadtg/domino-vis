@@ -40,7 +40,7 @@ function DominoAiMenu({ className }: { className: string }) {
     aiWorkerRef.current?.postMessage(depth);
   }*/
 
-  function submitMoveSearch(event: any) {
+  function submitMoveSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     //startAiSearch(parseInt(depth));
     if (

@@ -14,6 +14,7 @@ import {
   initialize,
   perfectPick,
   imperfectPick,
+  selectIsOver,
 } from "@/lib/features/domino/dominoSlice";
 import {
   selectGameInfo,
@@ -22,6 +23,8 @@ import {
 import { getPlayableSides } from "@/lib/features/domino/dominoUtils";
 import { USER } from "@/src/components/GameInitMenu";
 import "../DominoAiMenu/dominoWasmStore";
+import posthog from "posthog-js";
+import GameOverMenu from "../GameOverMenu";
 
 export type Gamemode = "14/14" | "7/7";
 
@@ -29,6 +32,7 @@ export default function DominoPlayground() {
   // TODO: rename this to DominoGame as to not confuse it with the playground pages
   const [gamemode, setGamemode] = React.useState<Gamemode>();
   const gameStatus = useAppSelector(({ dominoGame }) => dominoGame.gameStatus);
+  const isOver = useAppSelector(selectIsOver);
   const dispatch = useAppDispatch();
   // TODO: make this autopass functionality a configurable ingame option, or atleast give enough feedback that a player has passed
   // After more thought, this is a good default because the purpose of this entire App is to be a GUI to a domino ai, not a multiplayer game, thats another rabbit hole (hint: P2P)
@@ -58,6 +62,9 @@ export default function DominoPlayground() {
             !isBlocked
           ) {
             if (boneyard.count === 0) {
+              posthog.capture("auto-pass happened", {
+                gameInfoBefore: gameInfo,
+              });
               dispatch(pass());
             } else if (
               boneyard.count === 1 &&
@@ -65,6 +72,10 @@ export default function DominoPlayground() {
               boneyard.pieces[0].presence === "certain"
             ) {
               // this means there is only one piece left in the boneyard, just perfect pick it (btw only the boneyard.pieces.length === 1 clause is necessary, the rest are just a sanity check)
+              posthog.capture("auto-perfect-pick happened", {
+                gameInfoBefore: gameInfo,
+                piece: boneyard.pieces[0].piece,
+              });
               dispatch(perfectPick(boneyard.pieces[0].piece));
             } else if (
               boneyard.pieces.every(
@@ -73,6 +84,10 @@ export default function DominoPlayground() {
               (turn !== USER ||
                 boneyard.pieces.every(({ presence }) => presence === "certain")) // this is a guard safe so that we dont pick the entirety of the boneyard before knowing what is in it in the turn of the user
             ) {
+              posthog.capture("auto-imperfect-pick happened", {
+                gameInfoBefore: gameInfo,
+                amount: boneyard.count,
+              });
               dispatch(imperfectPick(boneyard.count));
             }
           }
@@ -86,14 +101,34 @@ export default function DominoPlayground() {
       {!gamemode ? (
         <div className="flex gap-2">
           <p>Choose mode: </p>
-          <Button onClick={() => setGamemode("14/14")}>14 vs 14</Button>
-          <Button onClick={() => setGamemode("7/7")}>7 vs 7</Button>
+          <Button
+            onClick={() => {
+              posthog.capture("gamemode set", { gamemode: "14 vs 14" });
+              setGamemode("14/14");
+            }}
+          >
+            14 vs 14
+          </Button>
+          <Button
+            onClick={() => {
+              posthog.capture("gamemode set", { gamemode: "7 vs 7 + boneyard" });
+              setGamemode("7/7");
+            }}
+          >
+            7 vs 7 + boneyard
+          </Button>
         </div>
       ) : gameStatus === "uninitialized" ? (
         <GameInitMenu gamemode={gamemode} />
       ) : (
         <>
           <DominoTable />
+          {isOver && (
+            <GameOverMenu
+              className="fixed bottom-0 left-[48px] top-0 my-auto h-1/2"
+              onReset={() => setGamemode(undefined)}
+            />
+          )}
           <DominoAiMenu className="fixed bottom-0 right-[48px] top-0 my-auto h-1/2" />
         </>
       )}
