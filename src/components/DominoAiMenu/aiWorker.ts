@@ -3,25 +3,48 @@ import {
   extractLeft,
   extractRight,
   newMovesContext,
-  extractHead,
+  extractType,
 } from "@/public/wasm/cToJShelpers";
 
 import { ModuleState } from "./dominoWasmStore";
 
 export function getAiMove(Module: any, game: number, depth: number): Move {
   const { move } = newMovesContext(Module); // FIXME: MEMORY LEAK!!!
-  Module.ccall(
-    "populate_best_move",
-    null,
-    ["number", "number", "number"],
-    [game, depth, move],
+  function deref_c_int(ptr: number) {
+    return Module._deref_int(ptr);
+  }
+
+  function alloc_c_int() {
+    return Module._alloc_int();
+  }
+
+  const cantPassPtr = alloc_c_int();
+
+  const numberOfPlayingMovesPtr = alloc_c_int();
+  const playingMovesArrPtr = Module._alloc_max_move_arr();
+
+  Module._get_playing_moves(
+    game,
+    playingMovesArrPtr,
+    numberOfPlayingMovesPtr,
+    cantPassPtr,
   );
+  Module._populate_move_by_ai(
+    game,
+    move,
+    playingMovesArrPtr,
+    deref_c_int(numberOfPlayingMovesPtr),
+    depth,
+  );
+
+  const LEFT = Module._get_LEFT();
+  const RIGHT = Module._get_RIGHT();
   return {
     piece: {
       left: extractLeft(Module, move),
       right: extractRight(Module, move),
     },
-    side: extractHead(Module, move) ? "right" : "left",
+    side: extractType(Module, move) === RIGHT ? "right" : "left",
   };
 }
 /*
