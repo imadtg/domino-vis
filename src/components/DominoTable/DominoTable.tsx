@@ -170,7 +170,9 @@ function Boneyard() {
   }
 
   function handleImperfectPick(amount: number) {
-    dispatch(imperfectPick(amount));
+    if (amount > 0) { // it is possible for the opponent to not do an imperfect pick, so a zero amount imperfect pick signifies that
+      dispatch(imperfectPick(amount));
+    }
     setHasImperfectPicked(true);
   }
 
@@ -209,7 +211,7 @@ function ImperfectPicker({ onImperfectPick }: ImperfectPickerProps) {
     <form className="w-fit" onSubmit={handleImperfectPickSubmit}>
       <fieldset className="flex flex-col gap-[8px] p-[8px]">
         <legend>
-          Unrevealed dominoes picker from the Boneyard{" "}
+          Unrevealed dominoes picker from the Boneyard
           {/* TODO: have a better explanation of what this is... */}
         </legend>
         <label htmlFor={`${id}-imperfect-pick`}>
@@ -222,8 +224,8 @@ function ImperfectPicker({ onImperfectPick }: ImperfectPickerProps) {
           value={imperfectPickAmount}
           onChange={(event) => setImperfectPickAmount(event.target.value)}
           required={true}
-          min="1"
-          placeholder="1"
+          min="0"
+          placeholder="0"
         />
         <Button>Pick from the boneyard</Button>
       </fieldset>
