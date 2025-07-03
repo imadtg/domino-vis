@@ -112,7 +112,7 @@ startAppListening({
   effect: async (action, listenerApi) => {
     console.log("Wasm middleware listened for imperfectPick: ", action.payload);
     const { move } = newMovesContext(ModuleState.Module); // THIS IS A FIXME: MEMORY LEAK!!!
-    ModuleState.Module._populate_move_from_components(move, action.payload);
+    ModuleState.Module._populate_imperfect_picking_move(move, action.payload);
     ModuleState.Module._imperfect_pick_by_pointer(ModuleState.game, move);
     printGame(ModuleState.Module, ModuleState.game);
   },
