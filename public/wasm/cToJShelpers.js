@@ -126,9 +126,17 @@ export function printGame(Module, game) {
 }
 
 export function newMovesContext(Module) {
-  const moves = Module.ccall("alloc_moves", "number");
-  const moveLengthPointer = Module.ccall("alloc_int", "number");
-  let move = Module.ccall("alloc_move", "number");
+    function deref_c_int(ptr) {
+    return Module._deref_int(ptr);
+  }
+
+  function alloc_c_int() {
+    return Module._alloc_int();
+  }
+
+  const moves = Module._alloc_max_move_arr();
+  const moveLengthPointer = alloc_c_int();
+  const move = Module._alloc_move();
   return { moves, moveLengthPointer, move };
 }
 
