@@ -99,7 +99,7 @@ export default function DominoPlayground() {
   const gameInfo = useAppSelector(selectGameInfo);
   let showAIMenu = false;
   if (typeof gameInfo !== "undefined") {
-    const { turn, hands, snake, boneyard } = gameInfo;
+    const { turn, hands, snake } = gameInfo;
     // TODO: detect when there is only one playable move and hide the AI Menu then since it is forced
     // this would involve also detecting equivalent moves, like when the snake sides have the same pip numbers, playing a piece on the left is equivalent to the right
     // it should then be treated as only one move, also detect when there are two distinct moves with one piece, for when the snake side pip numbers are the same as the piece's pip numbers
