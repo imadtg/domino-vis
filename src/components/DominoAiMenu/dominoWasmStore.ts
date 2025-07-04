@@ -31,6 +31,7 @@ startAppListening({
     console.log("Wasm middleware listened for initialize: ", action.payload);
     if (typeof ModuleState.Module === "undefined") {
       ModuleState.Module = await createConfiguredModule();
+      ModuleState.Module._init_fact();
     }
     ModuleState.game = newGame(ModuleState.Module); // THIS IS A FIXME: MEMORY LEAK!!!
     console.log("ModuleState :", ModuleState);
