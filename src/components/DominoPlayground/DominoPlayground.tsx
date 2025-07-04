@@ -21,8 +21,8 @@ import {
   selectIsBlocked,
 } from "@/lib/features/domino/dominoSlice";
 import { getPlayableSides } from "@/lib/features/domino/dominoUtils";
-//import "../DominoAiMenu/dominoWasmStore";
 import { USER } from "@/src/components/GameInitMenu";
+import "../DominoAiMenu/dominoWasmStore";
 import posthog from "posthog-js";
 import GameOverMenu from "../GameOverMenu";
 
@@ -129,7 +129,7 @@ export default function DominoPlayground() {
               onReset={() => setGamemode(undefined)}
             />
           )}
-          {/*<DominoAiMenu className="fixed bottom-0 right-[48px] top-0 my-auto h-1/2" />*/}
+          <DominoAiMenu className="fixed bottom-0 right-[48px] top-0 my-auto h-1/2" />
         </>
       )}
     </div>
