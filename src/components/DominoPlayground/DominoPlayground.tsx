@@ -96,6 +96,19 @@ export default function DominoPlayground() {
     );
     return unsubscribe;
   }, [dispatch]);
+  const gameInfo = useAppSelector(selectGameInfo);
+  let showAIMenu = false;
+  if (typeof gameInfo !== "undefined") {
+    const { turn, hands, snake } = gameInfo;
+    // TODO: detect when there is only one playable move and hide the AI Menu then since it is forced
+    // this would involve also detecting equivalent moves, like when the snake sides have the same pip numbers, playing a piece on the left is equivalent to the right
+    // it should then be treated as only one move, also detect when there are two distinct moves with one piece, for when the snake side pip numbers are the same as the piece's pip numbers
+    showAIMenu =
+      turn === USER &&
+      hands[turn].pieces.filter(
+        ({ piece }) => getPlayableSides(snake, piece).length > 0,
+      ).length > 0; // only show the AI menu for the USER and when they can play a move
+  }
   return (
     <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
       {!gamemode ? (
@@ -111,7 +124,9 @@ export default function DominoPlayground() {
           </Button>
           <Button
             onClick={() => {
-              posthog.capture("gamemode set", { gamemode: "7 vs 7 + boneyard" });
+              posthog.capture("gamemode set", {
+                gamemode: "7 vs 7 + boneyard",
+              });
               setGamemode("7/7");
             }}
           >
@@ -129,7 +144,14 @@ export default function DominoPlayground() {
               onReset={() => setGamemode(undefined)}
             />
           )}
-          <DominoAiMenu className="fixed bottom-0 right-[48px] top-0 my-auto h-1/2" />
+          {/* we hide the menu while still rendering it to preserve depth of search across turns */}
+          <DominoAiMenu
+            className={
+              showAIMenu
+                ? "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
+                : "hidden"
+            }
+          />
         </>
       )}
     </div>
