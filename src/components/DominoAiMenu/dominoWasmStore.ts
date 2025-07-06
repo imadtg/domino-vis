@@ -49,6 +49,7 @@ startAppListening({
       ModuleState.Module._absent_piece(USER, hands, piece.left, piece.right),
     );
     ModuleState.Module._emit_collapse(hands);
+    ModuleState.Module._set_turn(ModuleState.game, action.payload.turn);
     printGame(ModuleState.Module, ModuleState.game);
   },
 });

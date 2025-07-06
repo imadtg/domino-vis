@@ -17,6 +17,7 @@ import {
   DominoPiecePresence,
   getPlayableSides,
 } from "@/lib/features/domino/dominoUtils";
+import { addAppListener } from "@/lib/listenerMiddleware";
 
 import Snake from "@/src/components/Snake";
 import Hand from "@/src/components/Hand";
@@ -91,6 +92,18 @@ function DominoTable() {
     // but for this to be consistent, we should inflate clickboxes, and have adequate feedback that the side on which you click matters
     dispatch(playMove({ piece, side: sides[0] }));
   }
+
+  React.useEffect(() => {
+      const unsubscribe = dispatch(
+        addAppListener({
+          actionCreator: playMove,
+          effect: async () => {
+            setChosenPiece(undefined);
+          }
+        }),
+      );
+      return unsubscribe;
+    }, [dispatch, setChosenPiece]);
 
   return (
     <div className="relative flex h-full flex-col items-center">
