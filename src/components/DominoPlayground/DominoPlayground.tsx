@@ -138,20 +138,21 @@ export default function DominoPlayground() {
       ) : (
         <>
           <DominoTable />
-          {isOver && (
+          {isOver ? (
             <GameOverMenu
               className="fixed bottom-0 left-[48px] top-0 my-auto h-1/2"
               onReset={() => setGamemode(undefined)}
             />
+          ) : (
+            <DominoAiMenu
+              className={
+                showAIMenu
+                  ? "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
+                  : /* we hide the menu while still rendering it to preserve depth of search across turns */
+                    "hidden"
+              }
+            />
           )}
-          {/* we hide the menu while still rendering it to preserve depth of search across turns */}
-          <DominoAiMenu
-            className={
-              showAIMenu
-                ? "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
-                : "hidden"
-            }
-          />
         </>
       )}
     </div>
