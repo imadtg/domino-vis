@@ -94,16 +94,16 @@ function DominoTable() {
   }
 
   React.useEffect(() => {
-      const unsubscribe = dispatch(
-        addAppListener({
-          actionCreator: playMove,
-          effect: async () => {
-            setChosenPiece(undefined);
-          }
-        }),
-      );
-      return unsubscribe;
-    }, [dispatch, setChosenPiece]);
+    const unsubscribe = dispatch(
+      addAppListener({
+        actionCreator: playMove,
+        effect: async () => {
+          setChosenPiece(undefined);
+        },
+      }),
+    );
+    return unsubscribe;
+  }, [dispatch, setChosenPiece]);
 
   return (
     <div className="relative flex h-full flex-col items-center">
@@ -183,7 +183,8 @@ function Boneyard() {
   }
 
   function handleImperfectPick(amount: number) {
-    if (amount > 0) { // it is possible for the opponent to not do an imperfect pick, so a zero amount imperfect pick signifies that
+    if (amount > 0) {
+      // it is possible for the opponent to not do an imperfect pick, so a zero amount imperfect pick signifies that
       dispatch(imperfectPick(amount));
     }
     setHasImperfectPicked(true);
