@@ -4,6 +4,7 @@ import * as React from "react";
 import { playMove } from "@/lib/features/domino/dominoSlice";
 
 import { useAppDispatch } from "@/lib/hooks";
+import { addAppListener } from "@/lib/listenerMiddleware";
 
 import { ModuleState } from "@/src/components/DominoAiMenu/dominoWasmStore";
 
@@ -49,7 +50,9 @@ function DominoAiMenu({ className }: { className: string }) {
     ) {
       return;
     }
-    setBestMove(getAiMove(ModuleState.Module, ModuleState.game, parseInt(depth)));
+    setBestMove(
+      getAiMove(ModuleState.Module, ModuleState.game, parseInt(depth)),
+    );
   }
   function playBestMove() {
     if (typeof bestMove === "undefined") {
@@ -58,6 +61,19 @@ function DominoAiMenu({ className }: { className: string }) {
     dispatch(playMove(bestMove));
     setBestMove(undefined);
   }
+
+  React.useEffect(() => {
+    const unsubscribe = dispatch(
+      addAppListener({
+        actionCreator: playMove,
+        effect: async () => {
+          setBestMove(undefined);
+        },
+      }),
+    );
+    return unsubscribe;
+  }, [dispatch, setBestMove]);
+
   return (
     <div className={clsx("flex flex-col", className)}>
       <form onSubmit={submitMoveSearch}>
