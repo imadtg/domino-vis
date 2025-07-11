@@ -28,11 +28,17 @@ const FLEX_DIRECTIONS: Direction[] = [
 
 interface SnakeProps {
   snake: DominoPiece[];
-  onSideClick?: (side: Side) => void;
+  onSideClick: (side: Side) => undefined | (() => void);
   debug?: boolean; // this is for snake-playground. lets the user create arbitrary breakpoints instead of creating them based on layout.
+  highlightSide?: Side;
 }
 
-function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
+function Snake({
+  snake,
+  onSideClick,
+  debug = false,
+  highlightSide,
+}: SnakeProps) {
   //console.log("render of snake started...");
   // all of the logic here assumes pieces are added incrementally...
   const [firstPiece, setFirstPiece] = React.useState<DominoPiece>();
@@ -371,16 +377,17 @@ function Snake({ snake, onSideClick, debug = false }: SnakeProps) {
           segment={segment}
           direction={direction}
           onLeftSideClick={
-            index === 0 && onSideClick ? () => onSideClick("left") : undefined
+            index === 0 && onSideClick ? onSideClick("left") : undefined
           }
           onRightSideClick={
             index === segments.length - 1 && onSideClick
-              ? () => onSideClick("right")
+              ? onSideClick("right")
               : undefined
           }
           debug={debug}
           onPieceClick={debug ? (piece) => toggleBreakpoint(piece) : undefined}
           highlightPiece={debug ? pieceIsBreakpoint : undefined}
+          highlightSide={highlightSide}
           isAnchoredOnDouble={segmentIsAnchoredOnDouble(index)}
         />
       ))}
@@ -409,6 +416,7 @@ interface SnakeSegmentProps {
   debug?: boolean;
   onPieceClick?: (piece: DominoPiece) => void;
   highlightPiece?: (piece: DominoPiece) => boolean;
+  highlightSide?: Side; // this is used to highlight on which side the ai move can be placed, but i do admit the naming is a bit vague...
   isAnchoredOnDouble?: boolean;
 }
 
@@ -423,6 +431,7 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
       onLeftSideClick,
       onPieceClick,
       highlightPiece,
+      highlightSide,
       isAnchoredOnDouble = false,
       debug,
     }: SnakeSegmentProps,
@@ -485,6 +494,14 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
               interactive = true;
               variant = "highlighted";
               onClick = onRightSideClick;
+            }
+
+            if (
+              variant === "highlighted" &&
+              ((highlightSide === "left" && isLeftmostPiece) ||
+                (highlightSide === "right" && isRightmostPiece))
+            ) {
+              variant = "chosen"; // i admit its confusing how highlightSide makes the piece be a 'chosen' variant instead of 'highlighted'...
             }
           }
 

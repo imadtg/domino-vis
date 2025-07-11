@@ -1,14 +1,19 @@
 "use client";
 import * as React from "react";
-import { DominoPiece, HandInfo } from "@/lib/features/domino/dominoUtils";
+import {
+  comparePieces,
+  DominoPiece,
+  HandInfo,
+} from "@/lib/features/domino/dominoUtils";
 import DominoBlock from "../DominoBlock";
 
 interface HandProps {
   hand: HandInfo;
   onPieceClick?: (piece: DominoPiece) => React.MouseEventHandler | undefined;
+  highlightPiece?: DominoPiece;
 }
 
-function Hand({ hand, onPieceClick }: HandProps) {
+function Hand({ hand, onPieceClick, highlightPiece }: HandProps) {
   return (
     // idk if this is semantically correct, but i'm using abbr for displaying counts in a non-intrusive way.
     <abbr
@@ -17,13 +22,18 @@ function Hand({ hand, onPieceClick }: HandProps) {
     >
       {hand.pieces.map(({ piece, presence }) => {
         const onClick = onPieceClick?.(piece);
+        const isHighlighted =
+          typeof highlightPiece !== "undefined" &&
+          comparePieces(highlightPiece, piece);
         return (
           <DominoBlock
             as={onClick ? "button" : "div"}
             key={`${piece.left}-${piece.right}`}
             onClick={onClick}
             piece={piece}
-            variant={onClick ? "highlighted" : "default"}
+            variant={
+              onClick ? (isHighlighted ? "chosen" : "highlighted") : "default"
+            } // i admit isHighlighted making the piece take 'chosen' variant instead of 'highlighted' is a bit confusing...
             orientation="vertical"
             style={{ opacity: presence === "possible" ? "0.5" : "1" }}
           />

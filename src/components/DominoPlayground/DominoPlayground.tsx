@@ -25,6 +25,7 @@ import { USER } from "@/src/components/GameInitMenu";
 import "../DominoAiMenu/dominoWasmStore";
 import posthog from "posthog-js";
 import GameOverMenu from "../GameOverMenu";
+import { Move } from "@/lib/features/domino/dominoUtils";
 
 export type Gamemode = "14/14" | "7/7";
 
@@ -109,6 +110,20 @@ export default function DominoPlayground() {
         ({ piece }) => getPlayableSides(snake, piece).length > 0,
       ).length > 0; // only show the AI menu for the USER and when they can play a move
   }
+
+  const [bestMove, setBestMove] = React.useState<Move>();
+  React.useEffect(() => {
+    const unsubscribe = dispatch(
+      addAppListener({
+        actionCreator: playMove,
+        effect: async () => {
+          setBestMove(undefined);
+        },
+      }),
+    );
+    return unsubscribe;
+  }, [dispatch, setBestMove]);
+  
   return (
     <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
       {!gamemode ? (
@@ -136,8 +151,8 @@ export default function DominoPlayground() {
       ) : gameStatus === "uninitialized" ? (
         <GameInitMenu gamemode={gamemode} />
       ) : (
-        <>
-          <DominoTable />
+        <div className="flex h-full flex-row">
+          <DominoTable bestMove={bestMove} />
           {isOver ? (
             <GameOverMenu
               className="fixed bottom-0 left-[48px] top-0 my-auto h-1/2"
@@ -147,13 +162,14 @@ export default function DominoPlayground() {
             <DominoAiMenu
               className={
                 showAIMenu
-                  ? "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
+                  ? "h-1/2"
                   : /* we hide the menu while still rendering it to preserve depth of search across turns */
                     "hidden"
               }
+              setBestMove={setBestMove}
             />
           )}
-        </>
+        </div>
       )}
     </div>
   );

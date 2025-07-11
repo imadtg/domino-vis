@@ -105,6 +105,9 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
         state.gameInfo = collapse(state.gameInfo);
         const { gameInfo } = state;
         const move = normalizeMove(action.payload, gameInfo.snake);
+        if(typeof move.piece.origin === 'undefined'){ // AI move currently comes without a correct origin, so we should have this as a safety net
+          move.piece.origin = state.gameInfo.turn;
+        }
         switch (move.side) {
           case "left": {
             gameInfo.snake.unshift(move.piece);
