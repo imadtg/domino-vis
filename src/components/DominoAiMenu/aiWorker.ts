@@ -5,10 +5,24 @@ import {
   newMovesContext,
   extractType,
 } from "@/public/wasm/cToJShelpers";
+import { createConfiguredModule } from "@/public/wasm/cToJShelpers";
+import * as Comlink from "comlink";
 
-import { ModuleState } from "./dominoWasmStore";
+let Module: any;
+let initialized = false;
 
-export function getAiMove(Module: any, game: number, depth: number): Move {
+async function init(wasmMemory: WebAssembly.Memory) {
+  Module = await createConfiguredModule({
+    wasmMemory,
+  });
+  initialized = true;
+}
+
+function isInitialized() {
+  return initialized;
+}
+
+function getAiMove(game: number, depth: number): Move {
   const { move } = newMovesContext(Module); // FIXME: MEMORY LEAK!!!
   function deref_c_int(ptr: number) {
     return Module._deref_int(ptr);
@@ -47,13 +61,13 @@ export function getAiMove(Module: any, game: number, depth: number): Move {
     side: extractType(Module, move) === RIGHT ? "right" : "left",
   };
 }
-/*
-addEventListener("message", (event: MessageEvent<number>) => {
-  if (
-    typeof ModuleState.Module === "undefined" ||
-    typeof ModuleState.game === "undefined"
-  ) {
-    return;
-  }
-  postMessage(getAiMove(ModuleState.Module, ModuleState.game, event.data));
-});*/
+
+const workerFunctions = {
+  init,
+  isInitialized,
+  getAiMove,
+};
+
+Comlink.expose(workerFunctions);
+
+export type WorkerType = typeof workerFunctions;

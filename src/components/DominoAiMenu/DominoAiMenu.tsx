@@ -12,48 +12,54 @@ import { Move } from "@/lib/features/domino/dominoUtils";
 import DominoBlock from "../DominoBlock";
 import Button from "../Button";
 import clsx from "clsx";
-import { getAiMove } from "./aiWorker";
+import * as Comlink from "comlink";
+import { WorkerType } from "./aiWorker";
 
 // this whole component would ideally be just a button and then, with iterative deepening, highlight a move in DominoTable.
-// perhaps we should add some global state / slice of highlighted move that we flush on every playMove
+// perhaps we should add some global state / slice of highlighted move that we flush on every playMove, or just prop drill it from DominoPlayground...
 
 function DominoAiMenu({ className }: { className: string }) {
   const dispatch = useAppDispatch();
   const [depth, setDepth] = React.useState("");
   const [bestMove, setBestMove] = React.useState<Move>();
-  /*const [searchStatus, setSearchStatus] = React.useState<
-    "idle" | "searching" | "done"
-  >("idle");*/
   const id = React.useId();
-  /*const aiWorkerRef = React.useRef<Worker>();
+  const aiWorkerRef = React.useRef<Worker>();
+  const aiWorkerInstance = React.useRef<Comlink.Remote<WorkerType>>();
 
   React.useEffect(() => {
-    console.log('this is')
     aiWorkerRef.current = new Worker(new URL("./aiWorker.ts", import.meta.url));
-    aiWorkerRef.current.onmessage = (event: MessageEvent<Move>) =>
-      setBestMove(event.data)
+    aiWorkerInstance.current = Comlink.wrap(aiWorkerRef.current);
     return () => {
       aiWorkerRef.current?.terminate();
     };
   }, []);
 
-  function startAiSearch(depth: number) {
-    aiWorkerRef.current?.postMessage(depth);
-  }*/
+  async function startAiSearch(depth: number) {
+    if (typeof aiWorkerInstance.current === "undefined") {
+      window.alert("Worker instance is not ready yet...");
+      return;
+    }
+    if (typeof ModuleState.game === "undefined") {
+      window.alert("No ongoing game!");
+      return;
+    }
+    if (!(await aiWorkerInstance.current.isInitialized())) {
+      console.log("we will now check if our wasm memory is shared");
+      console.log(
+        ModuleState.Module.buffer instanceof SharedArrayBuffer,
+      );
+      await aiWorkerInstance.current.init(ModuleState.Module.wasmMemory);
+    }
+    setBestMove(
+      await aiWorkerInstance.current.getAiMove(ModuleState.game, depth),
+    );
+  }
 
   function submitMoveSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    //startAiSearch(parseInt(depth));
-    if (
-      typeof ModuleState.Module === "undefined" ||
-      typeof ModuleState.game === "undefined"
-    ) {
-      return;
-    }
-    setBestMove(
-      getAiMove(ModuleState.Module, ModuleState.game, parseInt(depth)),
-    );
+    startAiSearch(parseInt(depth));
   }
+
   function playBestMove() {
     if (typeof bestMove === "undefined") {
       return;
@@ -72,7 +78,7 @@ function DominoAiMenu({ className }: { className: string }) {
       }),
     );
     return unsubscribe;
-  }, [dispatch, setBestMove]);
+  }, [dispatch]);
 
   return (
     <div className={clsx("flex flex-col", className)}>

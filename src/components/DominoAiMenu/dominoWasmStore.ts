@@ -22,7 +22,7 @@ import { startAppListening } from "../../../lib/listenerMiddleware";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { USER } from "../GameInitMenu";
 console.log("domino ai listener is going to attach itself...");
-export let ModuleState: { Module?: any; game?: number } = {};
+export let ModuleState: { Module?: any; game?: number, initialized: boolean } = {initialized: false};
 
 startAppListening({
   actionCreator: initialize,
@@ -32,6 +32,7 @@ startAppListening({
     if (typeof ModuleState.Module === "undefined") {
       ModuleState.Module = await createConfiguredModule();
       ModuleState.Module._init_fact();
+      ModuleState.initialized = true;
     }
     ModuleState.game = newGame(ModuleState.Module); // THIS IS A FIXME: MEMORY LEAK!!!
     console.log("ModuleState :", ModuleState);
