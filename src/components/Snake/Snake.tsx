@@ -376,13 +376,9 @@ function Snake({
           }}
           segment={segment}
           direction={direction}
-          onLeftSideClick={
-            index === 0 && onSideClick ? onSideClick("left") : undefined
-          }
+          onLeftSideClick={index === 0 ? onSideClick("left") : undefined}
           onRightSideClick={
-            index === segments.length - 1 && onSideClick
-              ? onSideClick("right")
-              : undefined
+            index === segments.length - 1 ? onSideClick("right") : undefined
           }
           debug={debug}
           onPieceClick={debug ? (piece) => toggleBreakpoint(piece) : undefined}
