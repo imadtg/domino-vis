@@ -27,12 +27,15 @@ interface PipConfig extends PipAlignment {
   pipGroup: PipGroup;
 }
 
-interface PipSvgProps extends PipConfig {}
+interface PipSvgProps extends PipConfig {
+  color?: string;
+}
 
 function PipSvg({
   horizontalAlign,
   verticalAlign,
   pipGroup,
+  color = "#F81F1F",
   ...delegated
 }: PipSvgProps) {
   // calculate the center of the pip
@@ -51,7 +54,7 @@ function PipSvg({
   } else if (verticalAlign === "bottom") {
     cy += VERTICAL_GAP;
   }
-  return <circle r={PIP_WIDTH} fill="#F81F1F" cx={cx} cy={cy} {...delegated} />;
+  return <circle r={PIP_WIDTH} fill={color} cx={cx} cy={cy} {...delegated} />;
 }
 
 interface PipInfo extends PipAlignment {}
@@ -110,12 +113,33 @@ const PIP_MAP: PipGroupInfoForNumber = {
   },
 };
 
+interface PipColorInfo {
+  [key: number]: string | undefined;
+}
+
+// i took this color palette from playdrift, except for 1, 4 and 5 because they had low contrast with the DominoBlock 'highlighted' variant
+const PIP_COLORS: PipColorInfo = {
+  [0]: undefined,
+  [1]: "#a64be7",
+  [2]: "#ef3636",
+  [3]: "#a37c59",
+  [4]: "#097969",
+  [5]: "#4682b4",
+  [6]: "#fd8b01",
+};
+
 interface DominoSvgProps {
   topNumber: number;
   bottomNumber: number;
 }
 
 function DominoSvg({ topNumber, bottomNumber }: DominoSvgProps) {
+  if (
+    typeof PIP_MAP[topNumber] === "undefined" ||
+    typeof PIP_MAP[bottomNumber] === "undefined"
+  ) {
+    throw new Error(`Invalid domino [${topNumber}|${bottomNumber}]`);
+  }
   return (
     <svg // TODO: refactor this svg (and maybe animate it's properties directly?).
       xmlns="http://www.w3.org/2000/svg"
@@ -153,12 +177,13 @@ function DominoSvg({ topNumber, bottomNumber }: DominoSvgProps) {
         );
       })()}
       <g>
-        {PIP_MAP[topNumber].pipInfos.map(
+        {PIP_MAP[topNumber]?.pipInfos?.map(
           ({ verticalAlign, horizontalAlign }) => (
             <PipSvg
               key={`${verticalAlign}-${horizontalAlign}`}
               verticalAlign={verticalAlign}
               horizontalAlign={horizontalAlign}
+              color={PIP_COLORS[topNumber]}
               pipGroup="top"
             />
           ),
@@ -171,6 +196,7 @@ function DominoSvg({ topNumber, bottomNumber }: DominoSvgProps) {
               key={`${verticalAlign}-${horizontalAlign}`}
               verticalAlign={verticalAlign}
               horizontalAlign={horizontalAlign}
+              color={PIP_COLORS[bottomNumber]}
               pipGroup="bottom"
             />
           ),
