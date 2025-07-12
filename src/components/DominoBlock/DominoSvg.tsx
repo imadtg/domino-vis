@@ -177,7 +177,7 @@ function DominoSvg({ topNumber, bottomNumber }: DominoSvgProps) {
         );
       })()}
       <g>
-        {PIP_MAP[topNumber]?.pipInfos?.map(
+        {PIP_MAP[topNumber].pipInfos.map(
           ({ verticalAlign, horizontalAlign }) => (
             <PipSvg
               key={`${verticalAlign}-${horizontalAlign}`}
