@@ -13,6 +13,7 @@ import {
 
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import {
+  comparePieces,
   DominoPiece,
   DominoPiecePresence,
   getPlayableSides,
@@ -142,7 +143,13 @@ function DominoTable({ bestMove }: DominoTableProps) {
                 ? handlePlayBestMove
                 : undefined
           }
-          highlightSide={bestMove && bestMove.side}
+          highlightSide={
+            bestMove &&
+            (typeof chosenPiece === "undefined" ||
+              comparePieces(chosenPiece, bestMove.piece))
+              ? bestMove.side
+              : undefined
+          }
         />
       </div>
       <Hand
