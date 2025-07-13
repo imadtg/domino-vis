@@ -28,11 +28,11 @@ export function extractLeft(Module, movePointer) {
 }
 
 export function extractRight(Module, movePointer) {
-  return Module._get_right_of_move(movePointer)
+  return Module._get_right_of_move(movePointer);
 }
 
 export function extractType(Module, movePointer) {
-  return Module._get_type_of_move(movePointer)
+  return Module._get_type_of_move(movePointer);
 }
 
 export function getHands(Module, game) {
@@ -126,7 +126,7 @@ export function printGame(Module, game) {
 }
 
 export function newMovesContext(Module) {
-    function deref_c_int(ptr) {
+  function deref_c_int(ptr) {
     return Module._deref_int(ptr);
   }
 
