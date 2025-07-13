@@ -96,6 +96,15 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
         if (!isPlaying(state)) {
           return;
         }
+        if (typeof action.payload.piece.origin === "undefined") {
+          // AI move currently comes without a correct origin, so we should have this as a safety net
+          // doing action.payload.piece.origin = state.gameInfo.turn here wouldn't have accounted for pieces that were picked from the boneyard then played by AI!
+          action.payload.piece.origin = state.gameInfo.hands[
+            state.gameInfo.turn
+          ].pieces.find(({ piece }) =>
+            comparePieces(piece, action.payload.piece),
+          )?.piece.origin;
+        }
         [...state.gameInfo.hands, state.gameInfo.boneyard].forEach((hand) => {
           hand.pieces = hand.pieces.filter(
             ({ piece }) => !comparePieces(piece, action.payload.piece),
@@ -105,9 +114,6 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
         state.gameInfo = collapse(state.gameInfo);
         const { gameInfo } = state;
         const move = normalizeMove(action.payload, gameInfo.snake);
-        if(typeof move.piece.origin === 'undefined'){ // AI move currently comes without a correct origin, so we should have this as a safety net
-          move.piece.origin = state.gameInfo.turn;
-        }
         switch (move.side) {
           case "left": {
             gameInfo.snake.unshift(move.piece);
