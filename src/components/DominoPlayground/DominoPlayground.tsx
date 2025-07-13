@@ -26,6 +26,7 @@ import "../DominoAiMenu/dominoWasmStore";
 import posthog from "posthog-js";
 import GameOverMenu from "../GameOverMenu";
 import { Move } from "@/lib/features/domino/dominoUtils";
+import Draggable from "react-draggable";
 
 export type Gamemode = "14/14" | "7/7";
 
@@ -111,6 +112,7 @@ export default function DominoPlayground() {
       ).length > 0; // only show the AI menu for the USER and when they can play a move
   }
 
+  const nodeRef = React.useRef(null);
   const [bestMove, setBestMove] = React.useState<Move>();
   React.useEffect(() => {
     const unsubscribe = dispatch(
@@ -123,7 +125,7 @@ export default function DominoPlayground() {
     );
     return unsubscribe;
   }, [dispatch, setBestMove]);
-  
+
   return (
     <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
       {!gamemode ? (
@@ -159,15 +161,19 @@ export default function DominoPlayground() {
               onReset={() => setGamemode(undefined)}
             />
           ) : (
-            <DominoAiMenu
-              className={
-                showAIMenu
-                  ? "h-1/2"
-                  : /* we hide the menu while still rendering it to preserve depth of search across turns */
-                    "hidden"
-              }
-              setBestMove={setBestMove}
-            />
+            <Draggable nodeRef={nodeRef}>
+              <div ref={nodeRef}>
+                <DominoAiMenu
+                  className={
+                    showAIMenu
+                      ? "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
+                      : /* we hide the menu while still rendering it to preserve depth of search across turns */
+                        "hidden"
+                  }
+                  setBestMove={setBestMove}
+                />
+              </div>
+            </Draggable>
           )}
         </div>
       )}
