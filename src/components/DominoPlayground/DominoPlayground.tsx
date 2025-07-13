@@ -25,6 +25,8 @@ import { USER } from "@/src/components/GameInitMenu";
 import "../DominoAiMenu/dominoWasmStore";
 import posthog from "posthog-js";
 import GameOverMenu from "../GameOverMenu";
+import { Move } from "@/lib/features/domino/dominoUtils";
+import Draggable from "react-draggable";
 
 export type Gamemode = "14/14" | "7/7";
 
@@ -109,6 +111,21 @@ export default function DominoPlayground() {
         ({ piece }) => getPlayableSides(snake, piece).length > 0,
       ).length > 0; // only show the AI menu for the USER and when they can play a move
   }
+
+  const nodeRef = React.useRef(null);
+  const [bestMove, setBestMove] = React.useState<Move>();
+  React.useEffect(() => {
+    const unsubscribe = dispatch(
+      addAppListener({
+        actionCreator: playMove,
+        effect: async () => {
+          setBestMove(undefined);
+        },
+      }),
+    );
+    return unsubscribe;
+  }, [dispatch, setBestMove]);
+
   return (
     <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
       {!gamemode ? (
@@ -136,24 +153,29 @@ export default function DominoPlayground() {
       ) : gameStatus === "uninitialized" ? (
         <GameInitMenu gamemode={gamemode} />
       ) : (
-        <>
-          <DominoTable />
+        <div className="flex h-full flex-row">
+          <DominoTable bestMove={bestMove} />
           {isOver ? (
             <GameOverMenu
               className="fixed bottom-0 left-[48px] top-0 my-auto h-1/2"
               onReset={() => setGamemode(undefined)}
             />
           ) : (
-            <DominoAiMenu
-              className={
-                showAIMenu
-                  ? "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
-                  : /* we hide the menu while still rendering it to preserve depth of search across turns */
-                    "hidden"
-              }
-            />
+            <Draggable nodeRef={nodeRef}>
+              <div ref={nodeRef}>
+                <DominoAiMenu
+                  className={
+                    showAIMenu
+                      ? "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
+                      : /* we hide the menu while still rendering it to preserve depth of search across turns */
+                        "hidden"
+                  }
+                  setBestMove={setBestMove}
+                />
+              </div>
+            </Draggable>
           )}
-        </>
+        </div>
       )}
     </div>
   );

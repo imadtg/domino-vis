@@ -13,6 +13,7 @@ import {
 
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import {
+  comparePieces,
   DominoPiece,
   DominoPiecePresence,
   getPlayableSides,
@@ -23,8 +24,13 @@ import Snake from "@/src/components/Snake";
 import Hand from "@/src/components/Hand";
 import Button from "../Button";
 import { USER } from "../GameInitMenu";
+import { Move, Side } from "@/lib/features/domino/dominoUtils";
 
-function DominoTable() {
+interface DominoTableProps {
+  bestMove?: Move;
+}
+
+function DominoTable({ bestMove }: DominoTableProps) {
   const dispatch = useAppDispatch();
   const gameInfo = useAppSelector(selectGameInfo);
   const isOver = useAppSelector(selectIsOver);
@@ -56,12 +62,19 @@ function DominoTable() {
       ({ piece }) => getPlayableSides(snake, piece).length === 0,
     );
 
-  function handlePlayChosenPiece(side: "left" | "right") {
+  function handlePlayChosenPiece(side: Side) {
     if (!chosenPiece) {
       return;
     }
     dispatch(playMove({ piece: chosenPiece, side }));
     setChosenPiece(undefined);
+  }
+
+  function handlePlayBestMove() {
+    if (typeof bestMove === "undefined") {
+      return;
+    }
+    dispatch(playMove(bestMove));
   }
 
   function handleClickPiece(piece: DominoPiece) {
@@ -116,11 +129,27 @@ function DominoTable() {
             ? () => handleClickPiece(piece)
             : undefined
         }
+        highlightPiece={
+          bestMove && turn === OPPONENT ? bestMove.piece : undefined
+        }
       />
-      <div className="relative w-screen flex-1 px-16 outline outline-offset-4 outline-pink-400">
+      <div className="relative flex-1 self-stretch px-16 outline outline-offset-4 outline-pink-400">
         <Snake
           snake={snake}
-          onSideClick={chosenPiece ? handlePlayChosenPiece : undefined}
+          onSideClick={(side) =>
+            chosenPiece
+              ? () => handlePlayChosenPiece(side)
+              : bestMove && bestMove.side === side
+                ? handlePlayBestMove
+                : undefined
+          }
+          highlightSide={
+            bestMove &&
+            (typeof chosenPiece === "undefined" ||
+              comparePieces(chosenPiece, bestMove.piece))
+              ? bestMove.side
+              : undefined
+          }
         />
       </div>
       <Hand
@@ -130,6 +159,7 @@ function DominoTable() {
             ? () => handleClickPiece(piece)
             : undefined
         }
+        highlightPiece={bestMove && turn === USER ? bestMove.piece : undefined}
       />
       {canPickFromBoneyard && (
         <>

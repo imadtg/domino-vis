@@ -1,15 +1,11 @@
 "use client";
 import * as React from "react";
 
-import { playMove } from "@/lib/features/domino/dominoSlice";
-
 import { useAppDispatch } from "@/lib/hooks";
-import { addAppListener } from "@/lib/listenerMiddleware";
 
 import { ModuleState } from "@/src/components/DominoAiMenu/dominoWasmStore";
 
 import { Move } from "@/lib/features/domino/dominoUtils";
-import DominoBlock from "../DominoBlock";
 import Button from "../Button";
 import clsx from "clsx";
 import { getAiMove } from "./aiWorker";
@@ -17,10 +13,14 @@ import { getAiMove } from "./aiWorker";
 // this whole component would ideally be just a button and then, with iterative deepening, highlight a move in DominoTable.
 // perhaps we should add some global state / slice of highlighted move that we flush on every playMove
 
-function DominoAiMenu({ className }: { className: string }) {
+interface DominoAiMenuProps {
+  className: string;
+  setBestMove: (move?: Move) => void;
+}
+
+function DominoAiMenu({ className, setBestMove }: DominoAiMenuProps) {
   const dispatch = useAppDispatch();
   const [depth, setDepth] = React.useState("");
-  const [bestMove, setBestMove] = React.useState<Move>();
   /*const [searchStatus, setSearchStatus] = React.useState<
     "idle" | "searching" | "done"
   >("idle");*/
@@ -54,25 +54,6 @@ function DominoAiMenu({ className }: { className: string }) {
       getAiMove(ModuleState.Module, ModuleState.game, parseInt(depth)),
     );
   }
-  function playBestMove() {
-    if (typeof bestMove === "undefined") {
-      return;
-    }
-    dispatch(playMove(bestMove));
-    setBestMove(undefined);
-  }
-
-  React.useEffect(() => {
-    const unsubscribe = dispatch(
-      addAppListener({
-        actionCreator: playMove,
-        effect: async () => {
-          setBestMove(undefined);
-        },
-      }),
-    );
-    return unsubscribe;
-  }, [dispatch, setBestMove]);
 
   return (
     <div className={clsx("flex flex-col", className)}>
@@ -91,19 +72,6 @@ function DominoAiMenu({ className }: { className: string }) {
           <Button>Find best move!</Button>
         </fieldset>
       </form>
-      {bestMove && (
-        <div>
-          Best move is{" "}
-          <DominoBlock
-            as="span"
-            className="inline-block"
-            dominoGroupId="ai-move-preview"
-            piece={bestMove.piece}
-          />{" "}
-          on the {bestMove.side},{" "}
-          <Button onClick={playBestMove}>Play it!</Button>
-        </div>
-      )}
     </div>
   );
 }

@@ -42,9 +42,9 @@ function SnakePlaygroundPage() {
       <div className="fixed inset-0 grid place-items-center p-16">
         <Snake
           snake={pieces}
-          onSideClick={
+          onSideClick={(side) =>
             pendingPiece
-              ? (side) => {
+              ? () => {
                   if (side === "left") {
                     setPieces([pendingPiece, ...pieces]);
                     setPendingPiece(undefined);
@@ -88,13 +88,13 @@ function SnakePlaygroundPage() {
         <Button>Submit</Button>
       </form>
       <Button
-        className="fixed h-fit bottom-0 left-0 top-0 my-auto"
+        className="fixed bottom-0 left-0 top-0 my-auto h-fit"
         onClick={() => autoPiece("left")}
       >
         auto left
       </Button>
       <Button
-        className="fixed h-fit bottom-0 right-0 top-0 my-auto"
+        className="fixed bottom-0 right-0 top-0 my-auto h-fit"
         onClick={() => autoPiece("right")}
       >
         auto right
