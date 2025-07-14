@@ -1,8 +1,6 @@
 "use client";
 import * as React from "react";
 
-import { useAppDispatch } from "@/lib/hooks";
-
 import { ModuleState } from "@/src/components/DominoAiMenu/dominoWasmStore";
 
 import { Move } from "@/lib/features/domino/dominoUtils";
@@ -17,7 +15,6 @@ interface DominoAiMenuProps {
 }
 
 function DominoAiMenu({ className, setBestMove }: DominoAiMenuProps) {
-  const dispatch = useAppDispatch();
   const [depth, setDepth] = React.useState("");
   const id = React.useId();
   const aiWorkerRef = React.useRef<Worker>();
@@ -41,20 +38,42 @@ function DominoAiMenu({ className, setBestMove }: DominoAiMenuProps) {
       return;
     }
     if (!(await aiWorkerInstance.current.isInitialized())) {
-      console.log("we will now check if our wasm memory is shared");
-      console.log(
-        ModuleState.Module.buffer instanceof SharedArrayBuffer,
-      );
       await aiWorkerInstance.current.init(ModuleState.Module.wasmMemory);
     }
-    setBestMove(
-      await aiWorkerInstance.current.getAiMove(ModuleState.game, depth),
+    const searchResults = await aiWorkerInstance.current.getAiMove(
+      ModuleState.game,
+      depth,
     );
+    if (searchResults.status === "success") {
+      setBestMove(searchResults.bestMove);
+    } else {
+      console.log("AI search was cancelled!");
+    }
   }
 
   function submitMoveSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     startAiSearch(parseInt(depth));
+  }
+
+  async function cancelAiSearch() {
+    if (typeof ModuleState.game === "undefined") {
+      window.alert("No ongoing game!");
+      return;
+    }
+    if (typeof ModuleState.fallbackPtr === "undefined") {
+      throw new Error(
+        "Attempted to cancel search but UI thread does not have the FALLBACK pointer!",
+      );
+    }
+    const sharedMemory = ModuleState.Module.wasmMemory as WebAssembly.Memory;
+    const sab = sharedMemory.buffer as unknown as SharedArrayBuffer;
+    const dv = new DataView(sab);
+    if (dv.getInt32(ModuleState.fallbackPtr, true)) {
+      window.alert("No ongoing AI search!");
+      return;
+    }
+    dv.setInt32(ModuleState.fallbackPtr, 1, true);
   }
 
   return (
@@ -72,6 +91,10 @@ function DominoAiMenu({ className, setBestMove }: DominoAiMenuProps) {
             pattern="[1-9][0-9]*"
           />
           <Button>Find best move!</Button>
+          {/* TODO: this should not be here, but instead happen whenever the player plays a move while the AI search is ongoing */}
+          <Button type="button" onClick={cancelAiSearch}>
+            Cancel search!
+          </Button>
         </fieldset>
       </form>
     </div>

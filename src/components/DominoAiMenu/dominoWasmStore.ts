@@ -22,7 +22,9 @@ import { startAppListening } from "../../../lib/listenerMiddleware";
 import { PayloadAction } from "@reduxjs/toolkit";
 import { USER } from "../GameInitMenu";
 console.log("domino ai listener is going to attach itself...");
-export let ModuleState: { Module?: any; game?: number, initialized: boolean } = {initialized: false};
+// TODO: start using this initialized boolean in here and in DominoAiMenu.tsx
+// and perhaps use Atomics instead for better synchronization...
+export let ModuleState: { Module?: any; game?: number, initialized: boolean, fallbackPtr?: number } = {initialized: false};
 
 startAppListening({
   actionCreator: initialize,
@@ -32,6 +34,7 @@ startAppListening({
     if (typeof ModuleState.Module === "undefined") {
       ModuleState.Module = await createConfiguredModule();
       ModuleState.Module._init_fact();
+      ModuleState.fallbackPtr = ModuleState.Module._get_fallback_ptr();
       ModuleState.initialized = true;
     }
     ModuleState.game = newGame(ModuleState.Module); // THIS IS A FIXME: MEMORY LEAK!!!

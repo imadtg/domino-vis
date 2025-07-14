@@ -3982,6 +3982,8 @@ async function createWasm() {
       return (...args) => ccall(ident, returnType, argTypes, args, opts);
     };
 
+
+
   FS.createPreloadedFile = FS_createPreloadedFile;
   FS.staticInit();;
 // End JS library code
@@ -4027,6 +4029,8 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
   Module['wasmMemory'] = wasmMemory;
   Module['ccall'] = ccall;
   Module['cwrap'] = cwrap;
+  Module['setValue'] = setValue;
+  Module['getValue'] = getValue;
   // End runtime exports
   // Begin JS library exports
   Module['ExitStatus'] = ExitStatus;
@@ -4162,6 +4166,10 @@ var _print_playing_moves = Module['_print_playing_moves'] = createExportWrapper(
 var _print_picking_moves = Module['_print_picking_moves'] = createExportWrapper('print_picking_moves', 2);
 var _endgame_evaluation = Module['_endgame_evaluation'] = createExportWrapper('endgame_evaluation', 1);
 var _main = Module['_main'] = createExportWrapper('main', 2);
+var _get_fallback_ptr = Module['_get_fallback_ptr'] = createExportWrapper('get_fallback_ptr', 0);
+var _get_fallback = Module['_get_fallback'] = createExportWrapper('get_fallback', 0);
+var _set_fallback = Module['_set_fallback'] = createExportWrapper('set_fallback', 0);
+var _reset_fallback = Module['_reset_fallback'] = createExportWrapper('reset_fallback', 0);
 var _get_number_of_players = Module['_get_number_of_players'] = createExportWrapper('get_number_of_players', 0);
 var _get_pips = Module['_get_pips'] = createExportWrapper('get_pips', 0);
 var _get_current_player = Module['_get_current_player'] = createExportWrapper('get_current_player', 0);

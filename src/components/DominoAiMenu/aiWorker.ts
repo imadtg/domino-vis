@@ -22,7 +22,14 @@ function isInitialized() {
   return initialized;
 }
 
-function getAiMove(game: number, depth: number): Move {
+type AiSearchResult =
+  | { status: "aborted" }
+  | { status: "success"; bestMove: Move };
+
+function getAiMove(game: number, depth: number): AiSearchResult {
+  // I know that i really should use Atomics... FALLBACK serves to indicate whether no search is ongoing right now...
+  // a bit overloaded from its first purpose of just cancelling searches i know...
+  Module._reset_fallback();
   const { move } = newMovesContext(Module); // FIXME: MEMORY LEAK!!!
   function deref_c_int(ptr: number) {
     return Module._deref_int(ptr);
@@ -50,15 +57,22 @@ function getAiMove(game: number, depth: number): Move {
     deref_c_int(numberOfPlayingMovesPtr),
     depth,
   );
-
+  if (Module._get_fallback()) {
+    return { status: "aborted" };
+  }
+  Module._set_fallback(); // again, i should really use Atomics... but FALLBACK right now still represents whether a search is ongoing...
+  // while also acting as a way to do early returns inside the search if this is set elsewhere (which triggers the if statement above)...
   const LEFT = Module._get_LEFT();
   const RIGHT = Module._get_RIGHT();
   return {
-    piece: {
-      left: extractLeft(Module, move),
-      right: extractRight(Module, move),
+    status: "success",
+    bestMove: {
+      piece: {
+        left: extractLeft(Module, move),
+        right: extractRight(Module, move),
+      },
+      side: extractType(Module, move) === RIGHT ? "right" : "left",
     },
-    side: extractType(Module, move) === RIGHT ? "right" : "left",
   };
 }
 
