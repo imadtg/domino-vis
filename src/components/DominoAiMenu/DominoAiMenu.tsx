@@ -1,52 +1,39 @@
 "use client";
 import * as React from "react";
 
-import { ModuleState } from "@/src/components/DominoAiMenu/dominoWasmStore";
-
 import { Move } from "@/lib/features/domino/dominoUtils";
 import Button from "../Button";
 import clsx from "clsx";
-import * as Comlink from "comlink";
-import { WorkerType } from "./aiWorker";
+import { AiSearchCancellationResult } from "./use-domino-ai";
+import { AiSearchResult } from "./aiWorker";
 
 interface DominoAiMenuProps {
   className: string;
   setBestMove: (move?: Move) => void;
+  getAiMove: (depth: number) => Promise<AiSearchResult>;
+  cancelAiSearch: () => AiSearchCancellationResult;
+  aiSearchIsOngoing: boolean;
 }
 
-function DominoAiMenu({ className, setBestMove }: DominoAiMenuProps) {
+function DominoAiMenu({
+  className,
+  setBestMove,
+  getAiMove,
+  cancelAiSearch,
+  aiSearchIsOngoing,
+}: DominoAiMenuProps) {
   const [depth, setDepth] = React.useState("");
   const id = React.useId();
-  const aiWorkerRef = React.useRef<Worker>();
-  const aiWorkerInstance = React.useRef<Comlink.Remote<WorkerType>>();
-
-  React.useEffect(() => {
-    aiWorkerRef.current = new Worker(new URL("./aiWorker.ts", import.meta.url));
-    aiWorkerInstance.current = Comlink.wrap(aiWorkerRef.current);
-    return () => {
-      aiWorkerRef.current?.terminate();
-    };
-  }, []);
 
   async function startAiSearch(depth: number) {
-    if (typeof aiWorkerInstance.current === "undefined") {
-      window.alert("Worker instance is not ready yet...");
+    if (aiSearchIsOngoing) {
+      window.alert("An AI search is already ongoing!");
       return;
     }
-    if (typeof ModuleState.game === "undefined") {
-      window.alert("No ongoing game!");
-      return;
-    }
-    if (!(await aiWorkerInstance.current.isInitialized())) {
-      await aiWorkerInstance.current.init(ModuleState.Module.wasmMemory);
-    }
-    const searchResults = await aiWorkerInstance.current.getAiMove(
-      ModuleState.game,
-      depth,
-    );
+    const searchResults = await getAiMove(depth);
     if (searchResults.status === "success") {
       setBestMove(searchResults.bestMove);
-    } else {
+    } else if (searchResults.status === "aborted") {
       console.log("AI search was cancelled!");
     }
   }
@@ -56,24 +43,11 @@ function DominoAiMenu({ className, setBestMove }: DominoAiMenuProps) {
     startAiSearch(parseInt(depth));
   }
 
-  async function cancelAiSearch() {
-    if (typeof ModuleState.game === "undefined") {
-      window.alert("No ongoing game!");
-      return;
-    }
-    if (typeof ModuleState.fallbackPtr === "undefined") {
-      throw new Error(
-        "Attempted to cancel search but UI thread does not have the FALLBACK pointer!",
-      );
-    }
-    const sharedMemory = ModuleState.Module.wasmMemory as WebAssembly.Memory;
-    const sab = sharedMemory.buffer as unknown as SharedArrayBuffer;
-    const dv = new DataView(sab);
-    if (dv.getInt32(ModuleState.fallbackPtr, true)) {
+  function onCancelSearch() {
+    const result = cancelAiSearch();
+    if (result === "no ongoing search") {
       window.alert("No ongoing AI search!");
-      return;
     }
-    dv.setInt32(ModuleState.fallbackPtr, 1, true);
   }
 
   return (
@@ -92,7 +66,7 @@ function DominoAiMenu({ className, setBestMove }: DominoAiMenuProps) {
           />
           <Button>Find best move!</Button>
           {/* TODO: this should not be here, but instead happen whenever the player plays a move while the AI search is ongoing */}
-          <Button type="button" onClick={cancelAiSearch}>
+          <Button type="button" onClick={onCancelSearch}>
             Cancel search!
           </Button>
         </fieldset>

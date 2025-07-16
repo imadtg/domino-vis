@@ -22,11 +22,12 @@ import {
 } from "@/lib/features/domino/dominoSlice";
 import { getPlayableSides } from "@/lib/features/domino/dominoUtils";
 import { USER } from "@/src/components/GameInitMenu";
-import "../DominoAiMenu/dominoWasmStore";
 import posthog from "posthog-js";
 import GameOverMenu from "../GameOverMenu";
 import { Move } from "@/lib/features/domino/dominoUtils";
 import Draggable from "react-draggable";
+import useDominoAi from "../DominoAiMenu/use-domino-ai";
+import { get } from "lodash";
 
 export type Gamemode = "14/14" | "7/7";
 
@@ -97,7 +98,7 @@ export default function DominoPlayground() {
       }),
     );
     return unsubscribe;
-  }, [dispatch]);
+  }, []);
   const gameInfo = useAppSelector(selectGameInfo);
   let showAIMenu = false;
   if (typeof gameInfo !== "undefined") {
@@ -119,12 +120,15 @@ export default function DominoPlayground() {
       addAppListener({
         actionCreator: playMove,
         effect: async () => {
+          cancelAiSearch();
           setBestMove(undefined);
         },
       }),
     );
     return unsubscribe;
-  }, [dispatch, setBestMove]);
+  }, []);
+
+  const { getAiMove, cancelAiSearch, aiSearchIsOngoing } = useDominoAi();
 
   return (
     <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
@@ -171,6 +175,9 @@ export default function DominoPlayground() {
                         "hidden"
                   }
                   setBestMove={setBestMove}
+                  getAiMove={getAiMove}
+                  cancelAiSearch={cancelAiSearch}
+                  aiSearchIsOngoing={aiSearchIsOngoing}
                 />
               </div>
             </Draggable>
