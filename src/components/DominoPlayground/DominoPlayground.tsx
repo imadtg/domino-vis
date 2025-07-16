@@ -38,6 +38,7 @@ export default function DominoPlayground() {
   // TODO: make this autopass functionality a configurable ingame option, or atleast give enough feedback that a player has passed
   // After more thought, this is a good default because the purpose of this entire App is to be a GUI to a domino ai, not a multiplayer game, thats another rabbit hole (hint: P2P)
   // but visible feedback is still welcome...
+  // TODO: also, this should be a hook...
   React.useEffect(() => {
     const unsubscribe = dispatch(
       addAppListener({
@@ -111,6 +112,7 @@ export default function DominoPlayground() {
       ).length > 0; // only show the AI menu for the USER and when they can play a move
   }
 
+  const { getAiMove, cancelAiSearch, aiSearchIsOngoing } = useDominoAi();
   const nodeRef = React.useRef(null);
   const [bestMove, setBestMove] = React.useState<Move>();
   React.useEffect(() => {
@@ -124,9 +126,7 @@ export default function DominoPlayground() {
       }),
     );
     return unsubscribe;
-  }, []);
-
-  const { getAiMove, cancelAiSearch, aiSearchIsOngoing } = useDominoAi();
+  }, [cancelAiSearch]);
 
   return (
     <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
