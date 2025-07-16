@@ -151,9 +151,9 @@ function getAiMove(depth: number): AiSearchResult {
 }
 
 const workerFunctions = {
-  // this is not the same as initialize below, this initializes the worker and its environment, 
+  // this is not the same as initialize below, this initializes the worker and its environment,
   // the one below is just a 'reducer' of the initialize action of dominoSlice.ts
-  init, 
+  init,
   isInitialized,
   // shared memory stuff to allow AI search to be cancellable
   getFallbackPtr,

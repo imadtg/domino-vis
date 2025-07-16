@@ -41,7 +41,7 @@ export default function useDominoAi() {
       const fallbackPtr = await aiWorker.getFallbackPtr();
       aiWorkerContextRef.current = { aiWorker, sab, fallbackPtr };
     }
-    initAiWorkerContextEnv(); 
+    initAiWorkerContextEnv();
     // should we save this promise in a ref and await it instead of erroring when AI worker context is not ready?
     // due to the nature of awaiting, we would not have the guarantee that the listeners below will postMessage their actions to the worker in order if we start awaiting inside of the listener...
   }, []);
@@ -165,7 +165,8 @@ export default function useDominoAi() {
     return "success";
   }
 
-  const [aiSearchIsOngoing, setAiSearchIsOngoing] = React.useState<boolean>(false); // this may be a performance bottleneck when we do iterative deepening...
+  const [aiSearchIsOngoing, setAiSearchIsOngoing] =
+    React.useState<boolean>(false); // this may be a performance bottleneck when we do iterative deepening...
 
   return {
     getAiMove: async (depth: number) => {
@@ -175,7 +176,7 @@ export default function useDominoAi() {
       setAiSearchIsOngoing(true);
       const result = await aiWorkerContextRef.current.aiWorker.getAiMove(depth);
       setAiSearchIsOngoing(false);
-      return result
+      return result;
     },
     cancelAiSearch,
     aiSearchIsOngoing,
