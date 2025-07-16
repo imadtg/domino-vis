@@ -27,8 +27,6 @@ import GameOverMenu from "../GameOverMenu";
 import { Move } from "@/lib/features/domino/dominoUtils";
 import Draggable from "react-draggable";
 import useDominoAi from "../DominoAiMenu/use-domino-ai";
-import { get } from "lodash";
-
 export type Gamemode = "14/14" | "7/7";
 
 export default function DominoPlayground() {
