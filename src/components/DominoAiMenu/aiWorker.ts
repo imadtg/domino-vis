@@ -98,7 +98,12 @@ function imperfectPick(amount: number) {
 
 export type AiSearchResult =
   | { status: "aborted" }
-  | { status: "success"; bestMove: Move };
+  | {
+      status: "success";
+      bestMove: Move;
+      score: number;
+      numberOfExploredNodes: number;
+    };
 
 function getAiMove(depth: number): AiSearchResult {
   // I know that i really should use Atomics... FALLBACK serves to indicate whether no search is ongoing right now...
@@ -113,6 +118,14 @@ function getAiMove(depth: number): AiSearchResult {
     return Module._alloc_int();
   }
 
+  function deref_c_float(ptr: number) {
+    return Module._deref_float(ptr);
+  }
+
+  function alloc_c_float() {
+    return Module._alloc_float();
+  }
+
   const cantPassPtr = alloc_c_int();
 
   const numberOfPlayingMovesPtr = alloc_c_int();
@@ -124,12 +137,17 @@ function getAiMove(depth: number): AiSearchResult {
     numberOfPlayingMovesPtr,
     cantPassPtr,
   );
+
+  const numberOfExploredNodesPtr = alloc_c_int();
+  const scorePtr = alloc_c_float();
   Module._populate_move_by_ai(
     game,
     move,
     playingMovesArrPtr,
     deref_c_int(numberOfPlayingMovesPtr),
     depth,
+    scorePtr,
+    numberOfExploredNodesPtr,
   );
   if (Module._get_fallback()) {
     return { status: "aborted" };
@@ -138,6 +156,11 @@ function getAiMove(depth: number): AiSearchResult {
   // while also acting as a way to do early returns inside the search if this is set elsewhere (which triggers the if statement above)...
   const LEFT = Module._get_LEFT();
   const RIGHT = Module._get_RIGHT();
+  const score = deref_c_float(scorePtr);
+  const numberOfExploredNodes = deref_c_int(numberOfExploredNodesPtr);
+  console.log(
+    `JS: found this move with score = ${score} and number of explored nodes = ${numberOfExploredNodes}`,
+  );
   return {
     status: "success",
     bestMove: {
@@ -147,6 +170,8 @@ function getAiMove(depth: number): AiSearchResult {
       },
       side: extractType(Module, move) === RIGHT ? "right" : "left",
     },
+    score,
+    numberOfExploredNodes,
   };
 }
 

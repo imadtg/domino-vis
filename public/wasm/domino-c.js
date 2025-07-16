@@ -4180,6 +4180,8 @@ var _set_turn = Module['_set_turn'] = createExportWrapper('set_turn', 2);
 var _get_turn = Module['_get_turn'] = createExportWrapper('get_turn', 1);
 var _alloc_int = Module['_alloc_int'] = createExportWrapper('alloc_int', 0);
 var _deref_int = Module['_deref_int'] = createExportWrapper('deref_int', 1);
+var _alloc_float = Module['_alloc_float'] = createExportWrapper('alloc_float', 0);
+var _deref_float = Module['_deref_float'] = createExportWrapper('deref_float', 1);
 var _alloc_max_move_arr = Module['_alloc_max_move_arr'] = createExportWrapper('alloc_max_move_arr', 0);
 var _alloc_move = Module['_alloc_move'] = createExportWrapper('alloc_move', 0);
 var _pick_all_boneyard = Module['_pick_all_boneyard'] = createExportWrapper('pick_all_boneyard', 1);
@@ -4191,7 +4193,7 @@ var _imperfect_pick_by_pointer = Module['_imperfect_pick_by_pointer'] = createEx
 var _get_snake = Module['_get_snake'] = createExportWrapper('get_snake', 1);
 var _populate_move_from_components = Module['_populate_move_from_components'] = createExportWrapper('populate_move_from_components', 4);
 var _populate_imperfect_picking_move = Module['_populate_imperfect_picking_move'] = createExportWrapper('populate_imperfect_picking_move', 2);
-var _populate_move_by_ai = Module['_populate_move_by_ai'] = createExportWrapper('populate_move_by_ai', 5);
+var _populate_move_by_ai = Module['_populate_move_by_ai'] = createExportWrapper('populate_move_by_ai', 7);
 var _get_left_of_move = Module['_get_left_of_move'] = createExportWrapper('get_left_of_move', 1);
 var _get_right_of_move = Module['_get_right_of_move'] = createExportWrapper('get_right_of_move', 1);
 var _get_type_of_move = Module['_get_type_of_move'] = createExportWrapper('get_type_of_move', 1);

@@ -50,6 +50,36 @@ function DominoAiMenu({
     }
   }
 
+  async function startIterativeDeepening() {
+    // there is most likely a race condition here, for the brief moment where we have finished a search and we are proceeding to the next one
+    // we have no way of knowing that a search is already ongoing via iterative deepening and thus we could not prevent another search from being interleaved, or worse, another iterative deepening!
+    // perhaps a solution to this is to move iterative deepening inside of the useDominoAi hook and use a callback to set the best move...
+    // if we decide to move this function to useDominoAi, we should accept a callback to set the bestMove and also return the bestMove (idk whether to use Move type or AiSearchResult type here though...)!
+    if (aiSearchIsOngoing) {
+      window.alert("An AI search is already ongoing!");
+      return;
+    }
+    let currentDepth = 1;
+    let lastNumberOfExploredNodes;
+    let currentNumberOfExploredNodes = 0;
+    let searchResults: AiSearchResult;
+    do {
+      searchResults = await getAiMove(currentDepth);
+      if (searchResults.status === "aborted") {
+        console.log("AI search was cancelled!");
+        return;
+      }
+      setBestMove(searchResults.bestMove);
+      currentDepth++;
+      lastNumberOfExploredNodes = currentNumberOfExploredNodes;
+      currentNumberOfExploredNodes = searchResults.numberOfExploredNodes;
+    } while (currentNumberOfExploredNodes > lastNumberOfExploredNodes);
+    console.log("Iterative deepening has finished!");
+    // final depth is one more than max depth because a deeper search is needed to verify that the previous search was indeed with the maximum depth
+    console.log(`Final depth: ${currentDepth}, Max depth: ${currentDepth - 1}`);
+    console.log(`Final search results: ${JSON.stringify(searchResults)}`);
+  }
+
   return (
     <div className={clsx("flex flex-col", className)}>
       <form onSubmit={submitMoveSearch}>
@@ -68,6 +98,9 @@ function DominoAiMenu({
           {/* TODO: this should not be here, but instead happen whenever the player plays a move while the AI search is ongoing */}
           <Button type="button" onClick={onCancelSearch}>
             Cancel search!
+          </Button>
+          <Button type="button" onClick={startIterativeDeepening}>
+            Do Iterative Deepening!
           </Button>
         </fieldset>
       </form>
