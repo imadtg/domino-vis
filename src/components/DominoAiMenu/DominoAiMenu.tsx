@@ -11,43 +11,23 @@ interface DominoAiMenuProps {
   className: string;
   setBestMove: (move?: Move) => void;
   getAiMove: (depth: number) => Promise<AiSearchResult>;
-  cancelAiSearch: () => AiSearchCancellationResult;
-  aiSearchIsOngoing: boolean;
 }
 
 function DominoAiMenu({
   className,
   setBestMove,
   getAiMove,
-  cancelAiSearch,
-  aiSearchIsOngoing,
 }: DominoAiMenuProps) {
-  const [depth, setDepth] = React.useState("");
-  const id = React.useId();
+  // TODO: use a useReducer for these? because they are tightly coupled...
+  const [iterativeDeepeningStatus, setIterativeDeepeningStatusStatus] =
+    React.useState<"ongoing" | "idle" | "finished">("idle");
+  const [latestSearchResult, setLatestSearchResult] =
+    React.useState<AiSearchResult>();
+  const [latestDepth, setLatestDepth] = React.useState<number>();
 
-  async function startAiSearch(depth: number) {
-    if (aiSearchIsOngoing) {
-      window.alert("An AI search is already ongoing!");
-      return;
-    }
-    const searchResults = await getAiMove(depth);
-    if (searchResults.status === "success") {
-      setBestMove(searchResults.bestMove);
-    } else if (searchResults.status === "aborted") {
-      console.log("AI search was cancelled!");
-    }
-  }
-
-  function submitMoveSearch(event: React.FormEvent<HTMLFormElement>) {
+  async function submitMoveSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    startAiSearch(parseInt(depth));
-  }
-
-  function onCancelSearch() {
-    const result = cancelAiSearch();
-    if (result === "no ongoing search") {
-      window.alert("No ongoing AI search!");
-    }
+    await startIterativeDeepening();
   }
 
   async function startIterativeDeepening() {
@@ -55,10 +35,11 @@ function DominoAiMenu({
     // we have no way of knowing that a search is already ongoing via iterative deepening and thus we could not prevent another search from being interleaved, or worse, another iterative deepening!
     // perhaps a solution to this is to move iterative deepening inside of the useDominoAi hook and use a callback to set the best move...
     // if we decide to move this function to useDominoAi, we should accept a callback to set the bestMove and also return the bestMove (idk whether to use Move type or AiSearchResult type here though...)!
-    if (aiSearchIsOngoing) {
+    if (iterativeDeepeningStatus === "ongoing") {
       window.alert("An AI search is already ongoing!");
       return;
     }
+    setIterativeDeepeningStatusStatus("ongoing");
     let currentDepth = 1;
     let lastNumberOfExploredNodes;
     let currentNumberOfExploredNodes = 0;
@@ -67,13 +48,19 @@ function DominoAiMenu({
       searchResults = await getAiMove(currentDepth);
       if (searchResults.status === "aborted") {
         console.log("AI search was cancelled!");
+        setIterativeDeepeningStatusStatus("idle");
+        setLatestSearchResult(undefined);
+        setLatestDepth(undefined);
         return;
       }
+      setLatestSearchResult(searchResults);
+      setLatestDepth(currentDepth);
       setBestMove(searchResults.bestMove);
       currentDepth++;
       lastNumberOfExploredNodes = currentNumberOfExploredNodes;
       currentNumberOfExploredNodes = searchResults.numberOfExploredNodes;
     } while (currentNumberOfExploredNodes > lastNumberOfExploredNodes);
+    setIterativeDeepeningStatusStatus("finished");
     console.log("Iterative deepening has finished!");
     // final depth is one more than max depth because a deeper search is needed to verify that the previous search was indeed with the maximum depth
     console.log(`Final depth: ${currentDepth}, Max depth: ${currentDepth - 1}`);
@@ -85,25 +72,26 @@ function DominoAiMenu({
       <form onSubmit={submitMoveSearch}>
         <fieldset className="flex flex-col gap-[8px] p-[8px]">
           <legend>Domino AI</legend>
-          <label htmlFor={`${id}-depth`}>Depth of search</label>
-          <input
-            id={`${id}-depth`}
-            type="text"
-            value={depth}
-            onChange={(event) => setDepth(event.target.value)}
-            placeholder="20"
-            pattern="[1-9][0-9]*"
-          />
-          <Button>Find best move!</Button>
-          {/* TODO: this should not be here, but instead happen whenever the player plays a move while the AI search is ongoing */}
-          <Button type="button" onClick={onCancelSearch}>
-            Cancel search!
-          </Button>
-          <Button type="button" onClick={startIterativeDeepening}>
-            Do Iterative Deepening!
-          </Button>
+          <Button className="whitespace-nowrap">Find best move!</Button>
         </fieldset>
       </form>
+      {iterativeDeepeningStatus === "ongoing" ? (
+        <p className="whitespace-nowrap">Searching...</p>
+      ) : iterativeDeepeningStatus === "finished" ? (
+        <p className="whitespace-nowrap">Search finished!</p>
+      ) : null}
+      {typeof latestSearchResult !== "undefined" &&
+      latestSearchResult.status === "success" ? (
+        <>
+          <p className="whitespace-nowrap">Depth = {latestDepth}</p>
+          <p className="whitespace-nowrap">
+            Score = {latestSearchResult.score}
+          </p>
+          <p className="whitespace-nowrap">
+            Explored nodes = {latestSearchResult.numberOfExploredNodes}
+          </p>
+        </>
+      ) : null}
     </div>
   );
 }

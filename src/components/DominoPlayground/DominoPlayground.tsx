@@ -112,7 +112,7 @@ export default function DominoPlayground() {
       ).length > 0; // only show the AI menu for the USER and when they can play a move
   }
 
-  const { getAiMove, cancelAiSearch, aiSearchIsOngoing } = useDominoAi();
+  const { getAiMove, cancelAiSearch } = useDominoAi();
   const nodeRef = React.useRef(null);
   const [bestMove, setBestMove] = React.useState<Move>();
   React.useEffect(() => {
@@ -174,8 +174,6 @@ export default function DominoPlayground() {
                   }
                   setBestMove={setBestMove}
                   getAiMove={getAiMove}
-                  cancelAiSearch={cancelAiSearch}
-                  aiSearchIsOngoing={aiSearchIsOngoing}
                 />
               </div>
             </Draggable>
