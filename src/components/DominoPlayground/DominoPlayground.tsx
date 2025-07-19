@@ -112,21 +112,8 @@ export default function DominoPlayground() {
       ).length > 0; // only show the AI menu for the USER and when they can play a move
   }
 
-  const { getAiMove, cancelAiSearch } = useDominoAi();
+  const { doIterativeDeepening, cancelAiSearch, bestMove } = useDominoAi();
   const nodeRef = React.useRef(null);
-  const [bestMove, setBestMove] = React.useState<Move>();
-  React.useEffect(() => {
-    const unsubscribe = dispatch(
-      addAppListener({
-        actionCreator: playMove,
-        effect: async () => {
-          cancelAiSearch();
-          setBestMove(undefined);
-        },
-      }),
-    );
-    return unsubscribe;
-  }, [cancelAiSearch]);
 
   return (
     <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
@@ -172,8 +159,7 @@ export default function DominoPlayground() {
                       : /* we hide the menu while still rendering it to preserve depth of search across turns */
                         "hidden"
                   }
-                  setBestMove={setBestMove}
-                  getAiMove={getAiMove}
+                  doIterativeDeepening={doIterativeDeepening}
                 />
               </div>
             </Draggable>

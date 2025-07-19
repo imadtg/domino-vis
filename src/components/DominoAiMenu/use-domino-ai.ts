@@ -18,11 +18,13 @@ import { WorkerType } from "./aiWorker";
 import { useAppDispatch } from "@/lib/hooks";
 import * as React from "react";
 import { addAppListener } from "@/lib/listenerMiddleware";
+import { IterativeDeepeningProgressInfo } from "./aiWorker";
 
 interface AiWorkerContext {
   aiWorker: Comlink.Remote<WorkerType>;
   sab: SharedArrayBuffer;
   fallbackPtr: number;
+  lockI32a: Int32Array; // a lock on operations that may cause best move to have a race condition
 }
 
 export type AiSearchCancellationResult = "success" | "no ongoing search";
@@ -39,7 +41,9 @@ export default function useDominoAi() {
       await aiWorker.init();
       const sab = await aiWorker.getSharedArrayBuffer();
       const fallbackPtr = await aiWorker.getFallbackPtr();
-      aiWorkerContextRef.current = { aiWorker, sab, fallbackPtr };
+      const lockSab = await aiWorker.getLockSab();
+      const lockI32a = new Int32Array(lockSab);
+      aiWorkerContextRef.current = { aiWorker, sab, fallbackPtr, lockI32a };
     }
     initAiWorkerContextEnv();
     // should we save this promise in a ref and await it instead of erroring when AI worker context is not ready?
@@ -157,16 +161,41 @@ export default function useDominoAi() {
     if (typeof aiWorkerContextRef.current === "undefined") {
       throw new Error("AI Worker is not ready!");
     }
+    const lockI32a = aiWorkerContextRef.current.lockI32a;
+    // START CRITICAL SECTION ON BEST MOVE
+    Atomics.wait(lockI32a, 0, 1); // is sync waiting okay here? i think not...
+    Atomics.store(lockI32a, 0, 1);
     const dv = new DataView(aiWorkerContextRef.current.sab);
     if (dv.getInt32(aiWorkerContextRef.current.fallbackPtr, true)) {
+      Atomics.store(lockI32a, 0, 0);
+      Atomics.notify(lockI32a, 0);
+      // END CRITICAL SECTION ON BEST MOVE
       return "no ongoing search";
     }
     dv.setInt32(aiWorkerContextRef.current.fallbackPtr, 1, true);
+    Atomics.store(lockI32a, 0, 0);
+    Atomics.notify(lockI32a, 0);
+    // END CRITICAL SECTION ON BEST MOVE
     return "success";
   }
 
   const [aiSearchIsOngoing, setAiSearchIsOngoing] =
     React.useState<boolean>(false); // this may be a performance bottleneck when we do iterative deepening...
+
+  const [bestMove, setBestMove] = React.useState<Move>();
+  React.useEffect(() => {
+    const unsubscribe = dispatch(
+      addAppListener({
+        actionCreator: playMove,
+        effect: () => {
+          // should this be async? i do not think so...
+          cancelAiSearch();
+          setBestMove(undefined);
+        },
+      }),
+    );
+    return unsubscribe;
+  }, [cancelAiSearch]);
 
   return {
     getAiMove: async (depth: number) => {
@@ -175,10 +204,36 @@ export default function useDominoAi() {
       }
       setAiSearchIsOngoing(true);
       const result = await aiWorkerContextRef.current.aiWorker.getAiMove(depth);
+      if (result.status === "success") {
+        setBestMove(result.bestMove);
+      }
       setAiSearchIsOngoing(false);
       return result;
     },
+    doIterativeDeepening: async (
+      onProgress: (
+        progressInfo: IterativeDeepeningProgressInfo,
+      ) => Promise<void>,
+    ) => {
+      if (typeof aiWorkerContextRef.current === "undefined") {
+        throw new Error("AI Worker is not ready!");
+      }
+      setAiSearchIsOngoing(true);
+      async function onProgressWrapper(
+        progressInfo: IterativeDeepeningProgressInfo,
+      ) {
+        if (progressInfo.status === "ongoing") {
+          setBestMove(progressInfo.searchResult.bestMove);
+        }
+        return await onProgress(progressInfo);
+      }
+      await aiWorkerContextRef.current.aiWorker.doIterativeDeepening(
+        Comlink.proxy(onProgressWrapper),
+      );
+      setAiSearchIsOngoing(false);
+    },
     cancelAiSearch,
     aiSearchIsOngoing,
+    bestMove,
   };
 }

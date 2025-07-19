@@ -19,6 +19,10 @@ let Module: any;
 let fallbackPtr: number;
 let game: number;
 let initialized = false;
+// this is a lock/mutex that will help in making cancelAiSearch only finish after all progress callbacks of doIterativeDeepening have finished
+const lockSab = new SharedArrayBuffer(4);
+const lockI32a = new Int32Array(lockSab);
+Atomics.store(lockI32a, 0, 0); // initialize the lock to be unlocked
 
 async function init() {
   Module = await createConfiguredModule();
@@ -37,6 +41,10 @@ function getSharedArrayBuffer(): SharedArrayBuffer {
 
 function getFallbackPtr(): number {
   return fallbackPtr;
+}
+
+function getLockSab() {
+  return lockSab;
 }
 
 function initialize(initialGameInfo: DominoIngameInfo) {
@@ -96,19 +104,26 @@ function imperfectPick(amount: number) {
   printGame(Module, game);
 }
 
-export type AiSearchResult =
-  | { status: "aborted" }
-  | {
-      status: "success";
-      bestMove: Move;
-      score: number;
-      numberOfExploredNodes: number;
-    };
+interface SuccessfulAiSearchResult {
+  status: "success";
+  bestMove: Move;
+  score: number;
+  numberOfExploredNodes: number;
+}
 
-function getAiMove(depth: number): AiSearchResult {
-  // I know that i really should use Atomics... FALLBACK serves to indicate whether no search is ongoing right now...
-  // a bit overloaded from its first purpose of just cancelling searches i know...
-  Module._reset_fallback();
+interface AbortedAiSearchResult {
+  status: "aborted";
+}
+
+export type AiSearchResult = SuccessfulAiSearchResult | AbortedAiSearchResult;
+
+interface BareAiSearchContext {
+  movePtr: number;
+  scorePtr: number;
+  numberOfExploredNodesPtr: number;
+}
+
+function _getAiMove(depth: number): BareAiSearchContext {
   const { move } = newMovesContext(Module); // FIXME: MEMORY LEAK!!!
   function deref_c_int(ptr: number) {
     return Module._deref_int(ptr);
@@ -149,6 +164,25 @@ function getAiMove(depth: number): AiSearchResult {
     scorePtr,
     numberOfExploredNodesPtr,
   );
+  return {
+    movePtr: move,
+    scorePtr,
+    numberOfExploredNodesPtr,
+  };
+}
+
+function getAiMove(depth: number): AiSearchResult {
+  function deref_c_int(ptr: number) {
+    return Module._deref_int(ptr);
+  }
+
+  function deref_c_float(ptr: number) {
+    return Module._deref_float(ptr);
+  }
+  // I know that i really should use Atomics... FALLBACK serves to indicate whether no search is ongoing right now...
+  // a bit overloaded from its first purpose of just cancelling searches i know...
+  Module._reset_fallback();
+  const { movePtr, scorePtr, numberOfExploredNodesPtr } = _getAiMove(depth);
   if (Module._get_fallback()) {
     return { status: "aborted" };
   }
@@ -165,14 +199,104 @@ function getAiMove(depth: number): AiSearchResult {
     status: "success",
     bestMove: {
       piece: {
-        left: extractLeft(Module, move),
-        right: extractRight(Module, move),
+        left: extractLeft(Module, movePtr),
+        right: extractRight(Module, movePtr),
       },
-      side: extractType(Module, move) === RIGHT ? "right" : "left",
+      side: extractType(Module, movePtr) === RIGHT ? "right" : "left",
     },
     score,
     numberOfExploredNodes,
   };
+}
+
+export type IterativeDeepeningProgressInfo =
+  | { status: "ongoing"; searchResult: SuccessfulAiSearchResult; depth: number }
+  | { status: "interrupted" }
+  | { status: "finished" };
+
+/*
+function syncSleep(ms: number) {
+  var start = new Date().getTime(),
+    expire = start + ms;
+  while (new Date().getTime() < expire) {}
+  return;
+}
+
+async function asyncSleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+*/
+
+async function doIterativeDeepening(
+  onProgress: (progressInfo: IterativeDeepeningProgressInfo) => Promise<void>,
+) {
+  function deref_c_int(ptr: number) {
+    return Module._deref_int(ptr);
+  }
+
+  function deref_c_float(ptr: number) {
+    return Module._deref_float(ptr);
+  }
+  const LEFT = Module._get_LEFT();
+  const RIGHT = Module._get_RIGHT();
+  Module._reset_fallback();
+  let currentDepth = 1;
+  let lastNumberOfExploredNodes;
+  let currentNumberOfExploredNodes = 0;
+  let searchResult: AiSearchResult;
+  do {
+    // START CRITICAL SECTION ON BEST MOVE
+    Atomics.wait(lockI32a, 0, 1);
+    Atomics.store(lockI32a, 0, 1);
+    const { movePtr, scorePtr, numberOfExploredNodesPtr } =
+      _getAiMove(currentDepth);
+    if (Module._get_fallback()) {
+      await onProgress({ status: "interrupted" });
+      Atomics.store(lockI32a, 0, 0);
+      Atomics.notify(lockI32a, 0);
+      // END CRITICAL SECTION ON BEST MOVE
+      return;
+    }
+    const score = deref_c_float(scorePtr);
+    const numberOfExploredNodes = deref_c_int(numberOfExploredNodesPtr);
+    searchResult = {
+      status: "success",
+      bestMove: {
+        piece: {
+          left: extractLeft(Module, movePtr),
+          right: extractRight(Module, movePtr),
+        },
+        side: extractType(Module, movePtr) === RIGHT ? "right" : "left",
+      },
+      score,
+      numberOfExploredNodes,
+    };
+    /*
+    console.log(
+      "we are going to sleep synchronously for 30 seconds to check if a race condition exists...",
+    );
+    syncSleep(30000);
+    console.log("we have woken up from the synchronous sleep of 30 seconds!");
+    console.log(
+      "we are going to sleep asynchronously for 30 seconds to check if a race condition exists...",
+    );
+    await asyncSleep(30000);
+    console.log("we have woken up from the asynchronous sleep of 30 seconds!");
+    */
+    await onProgress({
+      status: "ongoing",
+      searchResult,
+      depth: currentDepth,
+    });
+    currentDepth++;
+    lastNumberOfExploredNodes = currentNumberOfExploredNodes;
+    currentNumberOfExploredNodes = searchResult.numberOfExploredNodes;
+    Atomics.store(lockI32a, 0, 0);
+    Atomics.notify(lockI32a, 0);
+    // END CRITICAL SECTION ON BEST MOVE
+  } while (currentNumberOfExploredNodes > lastNumberOfExploredNodes);
+  Module._set_fallback();
+  await onProgress({ status: "finished" });
 }
 
 const workerFunctions = {
@@ -183,6 +307,7 @@ const workerFunctions = {
   // shared memory stuff to allow AI search to be cancellable
   getFallbackPtr,
   getSharedArrayBuffer,
+  getLockSab,
   // these are just equivalents of the reducers of dominoSlice.ts to synchronize the UI state with the AI engine state
   initialize,
   playMove,
@@ -191,6 +316,7 @@ const workerFunctions = {
   imperfectPick,
   // this is the AI search
   getAiMove,
+  doIterativeDeepening,
 };
 
 Comlink.expose(workerFunctions);
