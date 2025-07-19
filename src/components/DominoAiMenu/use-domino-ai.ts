@@ -157,13 +157,13 @@ export default function useDominoAi() {
     return unsubscribe;
   }, []);
 
-  function cancelAiSearch(): AiSearchCancellationResult {
+  async function cancelAiSearch(): Promise<AiSearchCancellationResult> {
     if (typeof aiWorkerContextRef.current === "undefined") {
       throw new Error("AI Worker is not ready!");
     }
     const lockI32a = aiWorkerContextRef.current.lockI32a;
     // START CRITICAL SECTION ON BEST MOVE
-    Atomics.wait(lockI32a, 0, 1); // is sync waiting okay here? i think not...
+    await Atomics.waitAsync(lockI32a, 0, 1);
     Atomics.store(lockI32a, 0, 1);
     const dv = new DataView(aiWorkerContextRef.current.sab);
     if (dv.getInt32(aiWorkerContextRef.current.fallbackPtr, true)) {
@@ -187,9 +187,8 @@ export default function useDominoAi() {
     const unsubscribe = dispatch(
       addAppListener({
         actionCreator: playMove,
-        effect: () => {
-          // should this be async? i do not think so...
-          cancelAiSearch();
+        effect: async () => {
+          await cancelAiSearch();
           setBestMove(undefined);
         },
       }),
