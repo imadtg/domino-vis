@@ -64,7 +64,6 @@ function DominoAiMenu({
         case "ongoing":
           setLatestSearchResult(progressInfo.searchResult);
           setLatestDepth(progressInfo.depth);
-          setBestMove(progressInfo.searchResult.bestMove);
           break;
         case "interrupted":
           setIterativeDeepeningStatusStatus("idle");
