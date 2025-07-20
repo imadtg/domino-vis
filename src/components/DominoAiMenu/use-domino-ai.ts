@@ -15,6 +15,7 @@ import { PayloadAction } from "@reduxjs/toolkit";
 
 import * as Comlink from "comlink";
 import { WorkerType } from "./aiWorker";
+import { releaseLock, acquireLockAsync } from "./lock.helpers";
 import { useAppDispatch } from "@/lib/hooks";
 import * as React from "react";
 import { addAppListener } from "@/lib/listenerMiddleware";
@@ -24,7 +25,7 @@ interface AiWorkerContext {
   aiWorker: Comlink.Remote<WorkerType>;
   sab: SharedArrayBuffer;
   fallbackPtr: number;
-  lockI32a: Int32Array; // a lock on operations that may cause best move to have a race condition
+  bestMoveLock: Int32Array; // a lock on operations that may alter the bestMove (below, returned by React.useState)
 }
 
 export type AiSearchCancellationResult = "success" | "no ongoing search";
@@ -41,9 +42,8 @@ export default function useDominoAi() {
       await aiWorker.init();
       const sab = await aiWorker.getSharedArrayBuffer();
       const fallbackPtr = await aiWorker.getFallbackPtr();
-      const lockSab = await aiWorker.getLockSab();
-      const lockI32a = new Int32Array(lockSab);
-      aiWorkerContextRef.current = { aiWorker, sab, fallbackPtr, lockI32a };
+      const bestMoveLock = new Int32Array(await aiWorker.getBestMoveLock());
+      aiWorkerContextRef.current = { aiWorker, sab, fallbackPtr, bestMoveLock };
     }
     initAiWorkerContextEnv();
     // should we save this promise in a ref and await it instead of erroring when AI worker context is not ready?
@@ -161,20 +161,20 @@ export default function useDominoAi() {
     if (typeof aiWorkerContextRef.current === "undefined") {
       throw new Error("AI Worker is not ready!");
     }
-    const lockI32a = aiWorkerContextRef.current.lockI32a;
+    const bestMoveLock = aiWorkerContextRef.current.bestMoveLock;
     // START CRITICAL SECTION ON BEST MOVE
-    await Atomics.waitAsync(lockI32a, 0, 1);
-    Atomics.store(lockI32a, 0, 1);
+    console.log("Cancelling ai search!");
+    await acquireLockAsync(bestMoveLock);
     const dv = new DataView(aiWorkerContextRef.current.sab);
     if (dv.getInt32(aiWorkerContextRef.current.fallbackPtr, true)) {
-      Atomics.store(lockI32a, 0, 0);
-      Atomics.notify(lockI32a, 0);
+      console.log("Turns out, no search was ongoing!");
+      releaseLock(bestMoveLock);
       // END CRITICAL SECTION ON BEST MOVE
       return "no ongoing search";
     }
     dv.setInt32(aiWorkerContextRef.current.fallbackPtr, 1, true);
-    Atomics.store(lockI32a, 0, 0);
-    Atomics.notify(lockI32a, 0);
+    console.log("Search cancelled!");
+    releaseLock(bestMoveLock);
     // END CRITICAL SECTION ON BEST MOVE
     return "success";
   }

@@ -14,17 +14,23 @@ import {
   extractType,
 } from "@/public/wasm/cToJShelpers";
 import { USER } from "../GameInitMenu";
+import { newLock, acquireLock, releaseLock } from "./lock.helpers";
 
 let Module: any;
 let fallbackPtr: number;
 let game: number;
 let initialized = false;
-// this is a lock/mutex that will help in making cancelAiSearch only finish after all progress callbacks of doIterativeDeepening have finished
-const lockSab = new SharedArrayBuffer(4);
-const lockI32a = new Int32Array(lockSab);
-Atomics.store(lockI32a, 0, 0); // initialize the lock to be unlocked
-
+// this is a lock that will help in making cancelAiSearch only finish after all progress callbacks of doIterativeDeepening have finished
+const bestMoveLock = newLock();
+// i will see if this is necessary later... for now let me finish handling the lock above
+/*
+// this is a lock that will make sure the ai engine game state does not get corrupted by the worker possibly interleaving its async functions
+// we have to be extra careful that we do not dead lock here!
+// perhaps it will be better if we guarantee this sequentiality in a lockfree manner...
+const gameLock = newLock();
+*/
 async function init() {
+  // TODO: get a global worker lock and replace the throw new Errors in use-domino-ai.ts with Atomics.waitAsync of it
   Module = await createConfiguredModule();
   Module._init_fact();
   fallbackPtr = Module._get_fallback_ptr();
@@ -43,8 +49,8 @@ function getFallbackPtr(): number {
   return fallbackPtr;
 }
 
-function getLockSab() {
-  return lockSab;
+function getBestMoveLock() {
+  return bestMoveLock.buffer;
 }
 
 function initialize(initialGameInfo: DominoIngameInfo) {
@@ -214,7 +220,6 @@ export type IterativeDeepeningProgressInfo =
   | { status: "interrupted" }
   | { status: "finished" };
 
-/*
 function syncSleep(ms: number) {
   var start = new Date().getTime(),
     expire = start + ms;
@@ -225,7 +230,6 @@ function syncSleep(ms: number) {
 async function asyncSleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-*/
 
 async function doIterativeDeepening(
   onProgress: (progressInfo: IterativeDeepeningProgressInfo) => Promise<void>,
@@ -246,14 +250,12 @@ async function doIterativeDeepening(
   let searchResult: AiSearchResult;
   do {
     // START CRITICAL SECTION ON BEST MOVE
-    Atomics.wait(lockI32a, 0, 1);
-    Atomics.store(lockI32a, 0, 1);
+    acquireLock(bestMoveLock);
     const { movePtr, scorePtr, numberOfExploredNodesPtr } =
       _getAiMove(currentDepth);
     if (Module._get_fallback()) {
       await onProgress({ status: "interrupted" });
-      Atomics.store(lockI32a, 0, 0);
-      Atomics.notify(lockI32a, 0);
+      releaseLock(bestMoveLock);
       // END CRITICAL SECTION ON BEST MOVE
       return;
     }
@@ -277,12 +279,12 @@ async function doIterativeDeepening(
     );
     syncSleep(30000);
     console.log("we have woken up from the synchronous sleep of 30 seconds!");
+    */
     console.log(
       "we are going to sleep asynchronously for 30 seconds to check if a race condition exists...",
     );
     await asyncSleep(30000);
     console.log("we have woken up from the asynchronous sleep of 30 seconds!");
-    */
     await onProgress({
       status: "ongoing",
       searchResult,
@@ -291,8 +293,7 @@ async function doIterativeDeepening(
     currentDepth++;
     lastNumberOfExploredNodes = currentNumberOfExploredNodes;
     currentNumberOfExploredNodes = searchResult.numberOfExploredNodes;
-    Atomics.store(lockI32a, 0, 0);
-    Atomics.notify(lockI32a, 0);
+    releaseLock(bestMoveLock);
     // END CRITICAL SECTION ON BEST MOVE
   } while (currentNumberOfExploredNodes > lastNumberOfExploredNodes);
   Module._set_fallback();
@@ -307,7 +308,7 @@ const workerFunctions = {
   // shared memory stuff to allow AI search to be cancellable
   getFallbackPtr,
   getSharedArrayBuffer,
-  getLockSab,
+  getBestMoveLock,
   // these are just equivalents of the reducers of dominoSlice.ts to synchronize the UI state with the AI engine state
   initialize,
   playMove,
