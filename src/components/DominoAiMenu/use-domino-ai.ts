@@ -35,19 +35,28 @@ export default function useDominoAi() {
   const aiWorkerContextRef = React.useRef<AiWorkerContext>();
 
   React.useEffect(() => {
+    const bareAiWorker = new Worker(new URL("./aiWorker.ts", import.meta.url));
     async function initAiWorkerContextEnv() {
-      const aiWorker = Comlink.wrap<WorkerType>(
-        new Worker(new URL("./aiWorker.ts", import.meta.url)),
-      );
+      const aiWorker = Comlink.wrap<WorkerType>(bareAiWorker);
       await aiWorker.init();
       const sab = await aiWorker.getSharedArrayBuffer();
       const fallbackPtr = await aiWorker.getFallbackPtr();
       const bestMoveLock = new Int32Array(await aiWorker.getBestMoveLock());
       aiWorkerContextRef.current = { aiWorker, sab, fallbackPtr, bestMoveLock };
     }
-    initAiWorkerContextEnv();
+    const aiWorkerInitPromise = initAiWorkerContextEnv();
     // should we save this promise in a ref and await it instead of erroring when AI worker context is not ready?
     // due to the nature of awaiting, we would not have the guarantee that the listeners below will postMessage their actions to the worker in order if we start awaiting inside of the listener...
+    return () => {
+      // we await this because we have no nice way of cancelling it
+      // and calling the rpc style wrapper functions of the worker with it terminated causes problems
+      console.log("debug 1");
+      aiWorkerInitPromise.then(() => {
+        console.log("debug 2");
+        bareAiWorker.terminate();
+        console.log("debug 3");
+      });
+    };
   }, []);
 
   // the following listeners rely HEAVILY on being set up before any dominoSlice reducers are called!

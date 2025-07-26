@@ -16,7 +16,7 @@ export async function acquireLockAsync(lock: Int32Array) {
     if (oldValue === UNLOCKED) {
       break;
     }
-    await Atomics.waitAsync(lock, 0, LOCKED);
+    console.log(await Atomics.waitAsync(lock, 0, LOCKED));
   }
   console.log("Lock acquired!");
 }
@@ -28,7 +28,7 @@ export function acquireLock(lock: Int32Array) {
     if (oldValue === UNLOCKED) {
       break;
     }
-    Atomics.wait(lock, 0, LOCKED);
+    console.log(Atomics.wait(lock, 0, LOCKED));
   }
   console.log("Lock acquired!");
 }
