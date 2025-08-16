@@ -261,12 +261,12 @@ async function doIterativeDeepening(
     );
     syncSleep(30000);
     console.log("we have woken up from the synchronous sleep of 30 seconds!");
-    */
     console.log(
       "we are going to sleep asynchronously for 30 seconds to check if a race condition exists...",
     );
     await asyncSleep(30000);
     console.log("we have woken up from the asynchronous sleep of 30 seconds!");
+    */
     await onProgress({
       status: "ongoing",
       searchResult,

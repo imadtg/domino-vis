@@ -60,6 +60,9 @@ function DominoAiMenu({ className, doIterativeDeepening }: DominoAiMenuProps) {
       await asyncSleep(30000);
       console.log("we have woken up from the asynchronous sleep of 30 seconds!");
       */
+      if (signal.aborted) {
+        return;
+      }
       switch (progressInfo.status) {
         case "ongoing":
           setLatestSearchResult(progressInfo.searchResult);
