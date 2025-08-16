@@ -152,15 +152,14 @@ export default function DominoPlayground() {
           ) : (
             <Draggable nodeRef={nodeRef}>
               <div ref={nodeRef}>
-                <DominoAiMenu
-                  className={
-                    showAIMenu
-                      ? "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
-                      : /* we hide the menu while still rendering it to preserve depth of search across turns */
-                        "hidden"
-                  }
-                  doIterativeDeepening={doIterativeDeepening}
-                />
+                {showAIMenu ? (
+                  <DominoAiMenu
+                    className={
+                      "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
+                    }
+                    doIterativeDeepening={doIterativeDeepening}
+                  />
+                ) : null}
               </div>
             </Draggable>
           )}

@@ -9,14 +9,14 @@ import { AiSearchResult, IterativeDeepeningProgressInfo } from "./aiWorker";
 interface DominoAiMenuProps {
   className: string;
   doIterativeDeepening: (
-    onProgress: (progressInfo: IterativeDeepeningProgressInfo) => Promise<void>,
+    onProgress: (
+      progressInfo: IterativeDeepeningProgressInfo,
+      { signal }: { signal: AbortSignal },
+    ) => Promise<void>,
   ) => Promise<void>;
 }
 
-function DominoAiMenu({
-  className,
-  doIterativeDeepening,
-}: DominoAiMenuProps) {
+function DominoAiMenu({ className, doIterativeDeepening }: DominoAiMenuProps) {
   // TODO: use a useReducer for these? because they are tightly coupled...
   const [iterativeDeepeningStatus, setIterativeDeepeningStatusStatus] =
     React.useState<"ongoing" | "idle" | "finished">("idle");
@@ -47,7 +47,7 @@ function DominoAiMenu({
       return new Promise((resolve) => setTimeout(resolve, ms));
     }
     */
-    await doIterativeDeepening(async (progressInfo) => {
+    await doIterativeDeepening(async (progressInfo, { signal }) => {
       /*
       console.log(
         "we are going to sleep synchronously for 30 seconds to check if a race condition exists...",

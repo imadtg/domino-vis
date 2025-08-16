@@ -16,7 +16,11 @@ export async function acquireLockAsync(lock: Int32Array) {
     if (oldValue === UNLOCKED) {
       break;
     }
-    console.log(await Atomics.waitAsync(lock, 0, LOCKED));
+    const result = Atomics.waitAsync(lock, 0, LOCKED);
+    console.log(result);
+    if(result.async){
+      await result.value;
+    }
   }
   console.log("Lock acquired!");
 }
@@ -34,7 +38,9 @@ export function acquireLock(lock: Int32Array) {
 }
 
 export function releaseLock(lock: Int32Array) {
-  Atomics.store(lock, 0, UNLOCKED);
-  Atomics.notify(lock, 0);
+  if (Atomics.compareExchange(lock, 0, LOCKED, UNLOCKED) !== LOCKED) {
+    throw new Error("Attempted to release a lock that was not locked!");
+  }
+  Atomics.notify(lock, 0, 1);
   console.log("Lock released!");
 }

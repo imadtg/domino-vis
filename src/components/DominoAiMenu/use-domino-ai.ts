@@ -15,7 +15,6 @@ import { PayloadAction } from "@reduxjs/toolkit";
 
 import * as Comlink from "comlink";
 import { WorkerType } from "./aiWorker";
-import { releaseLock, acquireLockAsync } from "./lock.helpers";
 import { useAppDispatch } from "@/lib/hooks";
 import * as React from "react";
 import { addAppListener } from "@/lib/listenerMiddleware";
@@ -25,7 +24,6 @@ interface AiWorkerContext {
   aiWorker: Comlink.Remote<WorkerType>;
   sab: SharedArrayBuffer;
   fallbackPtr: number;
-  bestMoveLock: Int32Array; // a lock on operations that may alter the bestMove (below, returned by React.useState)
 }
 
 export type AiSearchCancellationResult = "success" | "no ongoing search";
@@ -41,8 +39,7 @@ export default function useDominoAi() {
       await aiWorker.init();
       const sab = await aiWorker.getSharedArrayBuffer();
       const fallbackPtr = await aiWorker.getFallbackPtr();
-      const bestMoveLock = new Int32Array(await aiWorker.getBestMoveLock());
-      aiWorkerContextRef.current = { aiWorker, sab, fallbackPtr, bestMoveLock };
+      aiWorkerContextRef.current = { aiWorker, sab, fallbackPtr };
     }
     const aiWorkerInitPromise = initAiWorkerContextEnv();
     // should we save this promise in a ref and await it instead of erroring when AI worker context is not ready?
@@ -166,25 +163,23 @@ export default function useDominoAi() {
     return unsubscribe;
   }, []);
 
-  async function cancelAiSearch(): Promise<AiSearchCancellationResult> {
+  const aiSearchAbortControllerRef = React.useRef<AbortController>(
+    new AbortController(),
+  );
+
+  function cancelAiSearch(): AiSearchCancellationResult {
     if (typeof aiWorkerContextRef.current === "undefined") {
       throw new Error("AI Worker is not ready!");
     }
-    const bestMoveLock = aiWorkerContextRef.current.bestMoveLock;
-    // START CRITICAL SECTION ON BEST MOVE
     console.log("Cancelling ai search!");
-    await acquireLockAsync(bestMoveLock);
     const dv = new DataView(aiWorkerContextRef.current.sab);
     if (dv.getInt32(aiWorkerContextRef.current.fallbackPtr, true)) {
       console.log("Turns out, no search was ongoing!");
-      releaseLock(bestMoveLock);
-      // END CRITICAL SECTION ON BEST MOVE
       return "no ongoing search";
     }
     dv.setInt32(aiWorkerContextRef.current.fallbackPtr, 1, true);
+    aiSearchAbortControllerRef.current.abort();
     console.log("Search cancelled!");
-    releaseLock(bestMoveLock);
-    // END CRITICAL SECTION ON BEST MOVE
     return "success";
   }
 
@@ -197,8 +192,9 @@ export default function useDominoAi() {
       addAppListener({
         actionCreator: playMove,
         effect: async () => {
-          await cancelAiSearch();
+          cancelAiSearch();
           setBestMove(undefined);
+          aiSearchAbortControllerRef.current = new AbortController();
         },
       }),
     );
@@ -221,19 +217,25 @@ export default function useDominoAi() {
     doIterativeDeepening: async (
       onProgress: (
         progressInfo: IterativeDeepeningProgressInfo,
+        { signal }: { signal: AbortSignal },
       ) => Promise<void>,
     ) => {
       if (typeof aiWorkerContextRef.current === "undefined") {
         throw new Error("AI Worker is not ready!");
       }
       setAiSearchIsOngoing(true);
+      const abortSignal = aiSearchAbortControllerRef.current.signal;
       async function onProgressWrapper(
         progressInfo: IterativeDeepeningProgressInfo,
       ) {
+        // is this sufficient? do we not need to setup an onabort thing here?
+        if (abortSignal.aborted) {
+          return;
+        }
         if (progressInfo.status === "ongoing") {
           setBestMove(progressInfo.searchResult.bestMove);
         }
-        return await onProgress(progressInfo);
+        return await onProgress(progressInfo, { signal: abortSignal });
       }
       await aiWorkerContextRef.current.aiWorker.doIterativeDeepening(
         Comlink.proxy(onProgressWrapper),

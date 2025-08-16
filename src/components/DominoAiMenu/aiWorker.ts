@@ -14,21 +14,11 @@ import {
   extractType,
 } from "@/public/wasm/cToJShelpers";
 import { USER } from "../GameInitMenu";
-import { newLock, acquireLock, releaseLock } from "./lock.helpers";
 
 let Module: any;
 let fallbackPtr: number;
 let game: number;
 let initialized = false;
-// this is a lock that will help in making cancelAiSearch only finish after all progress callbacks of doIterativeDeepening have finished
-const bestMoveLock = newLock();
-// i will see if this is necessary later... for now let me finish handling the lock above
-/*
-// this is a lock that will make sure the ai engine game state does not get corrupted by the worker possibly interleaving its async functions
-// we have to be extra careful that we do not dead lock here!
-// perhaps it will be better if we guarantee this sequentiality in a lockfree manner...
-const gameLock = newLock();
-*/
 async function init() {
   // TODO: get a global worker lock and replace the throw new Errors in use-domino-ai.ts with Atomics.waitAsync of it
   Module = await createConfiguredModule();
@@ -47,10 +37,6 @@ function getSharedArrayBuffer(): SharedArrayBuffer {
 
 function getFallbackPtr(): number {
   return fallbackPtr;
-}
-
-function getBestMoveLock() {
-  return bestMoveLock.buffer;
 }
 
 function initialize(initialGameInfo: DominoIngameInfo) {
@@ -249,14 +235,10 @@ async function doIterativeDeepening(
   let currentNumberOfExploredNodes = 0;
   let searchResult: AiSearchResult;
   do {
-    // START CRITICAL SECTION ON BEST MOVE
-    acquireLock(bestMoveLock);
     const { movePtr, scorePtr, numberOfExploredNodesPtr } =
       _getAiMove(currentDepth);
     if (Module._get_fallback()) {
       await onProgress({ status: "interrupted" });
-      releaseLock(bestMoveLock);
-      // END CRITICAL SECTION ON BEST MOVE
       return;
     }
     const score = deref_c_float(scorePtr);
@@ -293,8 +275,6 @@ async function doIterativeDeepening(
     currentDepth++;
     lastNumberOfExploredNodes = currentNumberOfExploredNodes;
     currentNumberOfExploredNodes = searchResult.numberOfExploredNodes;
-    releaseLock(bestMoveLock);
-    // END CRITICAL SECTION ON BEST MOVE
   } while (currentNumberOfExploredNodes > lastNumberOfExploredNodes);
   Module._set_fallback();
   await onProgress({ status: "finished" });
@@ -308,7 +288,6 @@ const workerFunctions = {
   // shared memory stuff to allow AI search to be cancellable
   getFallbackPtr,
   getSharedArrayBuffer,
-  getBestMoveLock,
   // these are just equivalents of the reducers of dominoSlice.ts to synchronize the UI state with the AI engine state
   initialize,
   playMove,
