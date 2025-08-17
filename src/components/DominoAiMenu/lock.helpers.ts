@@ -18,7 +18,7 @@ export async function acquireLockAsync(lock: Int32Array) {
     }
     const result = Atomics.waitAsync(lock, 0, LOCKED);
     console.log(result);
-    if(result.async){
+    if (result.async) {
       await result.value;
     }
   }

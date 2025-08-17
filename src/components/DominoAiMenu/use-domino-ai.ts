@@ -172,12 +172,13 @@ export default function useDominoAi() {
       throw new Error("AI Worker is not ready!");
     }
     console.log("Cancelling ai search!");
-    const dv = new DataView(aiWorkerContextRef.current.sab);
-    if (dv.getInt32(aiWorkerContextRef.current.fallbackPtr, true)) {
+    const i32 = new Int32Array(aiWorkerContextRef.current.sab);
+    const idx = aiWorkerContextRef.current.fallbackPtr >>> 2; // divide by 4 because we are converting a byte pointer to a 4 byte index
+    const prev = Atomics.exchange(i32, idx, 1);
+    if (prev === 1) {
       console.log("Turns out, no search was ongoing!");
       return "no ongoing search";
     }
-    dv.setInt32(aiWorkerContextRef.current.fallbackPtr, 1, true);
     aiSearchAbortControllerRef.current.abort();
     console.log("Search cancelled!");
     return "success";
