@@ -45,6 +45,9 @@ function DominoAiMenu({ className, doIterativeDeepening }: DominoAiMenuProps) {
           setLatestDepth(progressInfo.depth);
           break;
         case "interrupted":
+          // this is unreachable with how we are reporting progress right now
+          // and we shouldnt need it because we only interrupt the search as we pass the turn
+          // thus hiding this menu
           setIterativeDeepeningStatusStatus("idle");
           setLatestSearchResult(undefined);
           setLatestDepth(undefined);
