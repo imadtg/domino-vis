@@ -18,7 +18,7 @@ import { WorkerType } from "./aiWorker";
 import { useAppDispatch } from "@/lib/hooks";
 import * as React from "react";
 import { addAppListener } from "@/lib/listenerMiddleware";
-import { IterativeDeepeningProgressInfo } from "./aiWorker";
+import type { IterativeDeepeningProgressInfo } from "./aiWorker";
 
 interface AiWorkerContext {
   aiWorker: Comlink.Remote<WorkerType>;
