@@ -11,7 +11,7 @@ interface DominoAiMenuProps {
   doIterativeDeepening: (
     onProgress: (
       progressInfo: IterativeDeepeningProgressInfo,
-      { signal }: { signal: AbortSignal },
+      signal: AbortSignal,
     ) => Promise<void>,
   ) => Promise<void>;
 }
@@ -35,31 +35,7 @@ function DominoAiMenu({ className, doIterativeDeepening }: DominoAiMenuProps) {
       return;
     }
     setIterativeDeepeningStatusStatus("ongoing");
-    /*
-    function syncSleep(ms: number) {
-      var start = new Date().getTime(),
-        expire = start + ms;
-      while (new Date().getTime() < expire) {}
-      return;
-    }
-
-    async function asyncSleep(ms: number) {
-      return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-    */
-    await doIterativeDeepening(async (progressInfo, { signal }) => {
-      /*
-      console.log(
-        "we are going to sleep synchronously for 30 seconds to check if a race condition exists...",
-      );
-      syncSleep(30000);
-      console.log("we have woken up from the synchronous sleep of 30 seconds!");
-      console.log(
-        "we are going to sleep asynchronously for 30 seconds to check if a race condition exists...",
-      );
-      await asyncSleep(30000);
-      console.log("we have woken up from the asynchronous sleep of 30 seconds!");
-      */
+    await doIterativeDeepening(async (progressInfo, signal) => {
       if (signal.aborted) {
         return;
       }

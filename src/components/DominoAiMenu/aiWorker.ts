@@ -206,17 +206,6 @@ export type IterativeDeepeningProgressInfo =
   | { status: "interrupted" }
   | { status: "finished" };
 
-function syncSleep(ms: number) {
-  var start = new Date().getTime(),
-    expire = start + ms;
-  while (new Date().getTime() < expire) {}
-  return;
-}
-
-async function asyncSleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function doIterativeDeepening(
   onProgress: (progressInfo: IterativeDeepeningProgressInfo) => Promise<void>,
 ) {
@@ -255,18 +244,6 @@ async function doIterativeDeepening(
       score,
       numberOfExploredNodes,
     };
-    /*
-    console.log(
-      "we are going to sleep synchronously for 30 seconds to check if a race condition exists...",
-    );
-    syncSleep(30000);
-    console.log("we have woken up from the synchronous sleep of 30 seconds!");
-    console.log(
-      "we are going to sleep asynchronously for 30 seconds to check if a race condition exists...",
-    );
-    await asyncSleep(30000);
-    console.log("we have woken up from the asynchronous sleep of 30 seconds!");
-    */
     await onProgress({
       status: "ongoing",
       searchResult,
