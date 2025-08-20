@@ -158,6 +158,7 @@ export default function useDominoAi() {
     return unsubscribe;
   }, []);
 
+  // this is used to allow us to ignore stale progress reports from the AI worker in the onProgressWrapper below
   const aiSearchAbortControllerRef = React.useRef<AbortController>(
     new AbortController(),
   );
@@ -171,6 +172,7 @@ export default function useDominoAi() {
     const idx = aiWorkerContextRef.current.fallbackPtr >>> 2; // divide by 4 because we are converting a byte pointer to a 4 byte index
     Atomics.store(i32, idx, 1);
     aiSearchAbortControllerRef.current.abort();
+    aiSearchAbortControllerRef.current = new AbortController();
     console.log("Search cancelled if was ongoing!");
   }
 
@@ -185,7 +187,6 @@ export default function useDominoAi() {
         effect: async () => {
           cancelAiSearch();
           setBestMove(undefined);
-          aiSearchAbortControllerRef.current = new AbortController();
         },
       }),
     );
