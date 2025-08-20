@@ -3,11 +3,9 @@ import * as React from "react";
 
 import {
   imperfectPick,
-  pass,
   perfectPick,
   playMove,
   selectGameInfo,
-  selectIsBlocked,
   selectIsOver,
 } from "@/lib/features/domino/dominoSlice";
 
@@ -15,7 +13,6 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import {
   comparePieces,
   DominoPiece,
-  DominoPiecePresence,
   getPlayableSides,
 } from "@/lib/features/domino/dominoUtils";
 import { addAppListener } from "@/lib/listenerMiddleware";
@@ -93,7 +90,7 @@ function DominoTable({ bestMove }: DominoTableProps) {
     const sides = getPlayableSides(snake, piece);
     if (sides.length === 0) {
       // this should be an impossible state
-      debugger; // TODO: remove this or remove branch.
+      throw new Error("There are no playable sides to the snake?????");
       return;
     }
     if (sides.length > 1) {

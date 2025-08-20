@@ -24,7 +24,6 @@ import { getPlayableSides } from "@/lib/features/domino/dominoUtils";
 import { USER } from "@/src/components/GameInitMenu";
 import posthog from "posthog-js";
 import GameOverMenu from "../GameOverMenu";
-import { Move } from "@/lib/features/domino/dominoUtils";
 import Draggable from "react-draggable";
 import useDominoAi from "../DominoAiMenu/use-domino-ai";
 export type Gamemode = "14/14" | "7/7";

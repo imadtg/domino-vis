@@ -7,7 +7,6 @@ import {
   turnAround,
 } from "@/lib/features/domino/dominoUtils";
 import Button from "@/src/components/Button";
-import { LayoutGroup } from "framer-motion";
 
 function PiecePlaygroundPage() {
   const [pieces, setPieces] = React.useState<DominoPiece[]>([]);

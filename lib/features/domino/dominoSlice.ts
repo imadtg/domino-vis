@@ -1,5 +1,4 @@
 import { createAppSlice } from "@/lib/createAppSlice";
-import type { AppThunk } from "@/lib/store";
 import type {
   CreateSliceOptions,
   PayloadAction,
@@ -12,7 +11,6 @@ import {
   comparePieces,
   getPlayableSides,
   normalizeMove,
-  turnAround,
 } from "./dominoUtils";
 import posthog from "posthog-js";
 

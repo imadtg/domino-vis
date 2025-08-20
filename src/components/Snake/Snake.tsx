@@ -2,7 +2,6 @@
 import * as React from "react";
 import {
   comparePieces,
-  turnAround,
   DominoPiece,
   Side,
 } from "@/lib/features/domino/dominoUtils";
@@ -115,7 +114,7 @@ function Snake({
     }
   }
 
-  let segments: DominoPiece[][] = [];
+  const segments: DominoPiece[][] = [];
   let originSegmentIndex: number | undefined = undefined;
   let previousBreakpoint = -originPieceIndex;
   for (let i = 0; i < segmentBreakpoints.length; i++) {
@@ -524,6 +523,7 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
     );
   },
 );
+SnakeSegment.displayName = "SnakeSegment";
 
 // anchor madness...
 const DominoBlockWrapper = styled.div<{ $anchorName?: string }>`
