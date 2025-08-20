@@ -27,6 +27,10 @@ var readyPromise = new Promise((resolve, reject) => {
   readyPromiseReject = reject;
 });
 
+// The way we signal to a worker that it is hosting a pthread is to construct
+// it with a specific name.
+var ENVIRONMENT_IS_WASM_WORKER = globalThis.name == 'em-ww';
+
 // Determine the runtime environment we are in. You can customize this by
 // setting the ENVIRONMENT setting at compile time (see settings.js).
 
@@ -173,6 +177,9 @@ if (typeof WebAssembly != 'object') {
 
 var wasmMemory;
 
+// For sending to workers.
+var wasmModule;
+
 //========================================
 // Runtime essentials
 //========================================
@@ -199,6 +206,13 @@ function assert(condition, text) {
 
 // We used to include malloc/free by default in the past. Show a helpful error in
 // builds with assertions.
+function _malloc() {
+  abort('malloc() called but not included in the build - add `_malloc` to EXPORTED_FUNCTIONS');
+}
+function _free() {
+  // Show a helpful error since we used to include free by default in the past.
+  abort('free() called but not included in the build - add `_free` to EXPORTED_FUNCTIONS');
+}
 
 // Memory management
 
@@ -388,9 +402,62 @@ function unexportedRuntimeSymbol(sym) {
   }
 }
 
+/**
+ * Override `err`/`out`/`dbg` to report thread / worker information
+ */
+function initWorkerLogging() {
+  function getLogPrefix() {
+    if (wwParams?.wwID) {
+      return `ww:${wwParams?.wwID}:`
+    }
+    return `ww:0:`;
+  }
+
+  // Prefix all dbg() messages with the calling thread info.
+  var origDbg = dbg;
+  dbg = (...args) => origDbg(getLogPrefix(), ...args);
+}
+
+initWorkerLogging();
+
 // end include: runtime_debug.js
 // include: memoryprofiler.js
 // end include: memoryprofiler.js
+var wasmModuleReceived;
+
+// include: wasm_worker.js
+var wwParams;
+
+/**
+ * Called once the intiial message has been recieved from the creating thread.
+ * The `props` object is property bag sent via postMessage to create the worker.
+ *
+ * This function is called both in normal wasm workers and in audio worklets.
+ */
+function startWasmWorker(props) {
+  wwParams = props;
+  wasmMemory = props.wasmMemory;
+  updateMemoryViews();
+  wasmModuleReceived(props.wasm);
+  // Drop now unneeded references to from the Module object in this Worker,
+  // these are not needed anymore.
+  props.wasm = props.memMemory = 0;
+}
+
+if (ENVIRONMENT_IS_WASM_WORKER) {
+
+onmessage = (d) => {
+  // The first message sent to the Worker is always the bootstrap message.
+  // Drop this message listener, it served its purpose of bootstrapping
+  // the Wasm Module load, and is no longer needed. Let user code register
+  // any desired message handlers from now on.
+  /** @suppress {checkTypes} */
+  onmessage = null;
+  startWasmWorker(d.data);
+}
+
+}
+// end include: wasm_worker.js
 
 
 function updateMemoryViews() {
@@ -411,6 +478,35 @@ function updateMemoryViews() {
 assert(typeof Int32Array != 'undefined' && typeof Float64Array !== 'undefined' && Int32Array.prototype.subarray != undefined && Int32Array.prototype.set != undefined,
        'JS engine does not provide full typed array support');
 
+// In non-standalone/normal mode, we create the memory here.
+// include: runtime_init_memory.js
+// Create the wasm memory. (Note: this only applies if IMPORTED_MEMORY is defined)
+
+// check for full engine support (use string 'subarray' to avoid closure compiler confusion)
+
+function initMemory() {
+  if ((ENVIRONMENT_IS_WASM_WORKER)) { return }
+
+  if (Module['wasmMemory']) {
+    wasmMemory = Module['wasmMemory'];
+  } else
+  {
+    var INITIAL_MEMORY = Module['INITIAL_MEMORY'] || 16777216;
+
+    assert(INITIAL_MEMORY >= 65536, 'INITIAL_MEMORY should be larger than STACK_SIZE, was ' + INITIAL_MEMORY + '! (STACK_SIZE=' + 65536 + ')');
+    /** @suppress {checkTypes} */
+    wasmMemory = new WebAssembly.Memory({
+      'initial': INITIAL_MEMORY / 65536,
+      'maximum': INITIAL_MEMORY / 65536,
+      'shared': true,
+    });
+  }
+
+  updateMemoryViews();
+}
+
+// end include: runtime_init_memory.js
+
 function preRun() {
   if (Module['preRun']) {
     if (typeof Module['preRun'] == 'function') Module['preRun'] = [Module['preRun']];
@@ -427,6 +523,8 @@ function preRun() {
 function initRuntime() {
   assert(!runtimeInitialized);
   runtimeInitialized = true;
+
+  if (ENVIRONMENT_IS_WASM_WORKER) return _wasmWorkerInitializeRuntime();
 
   checkStackCookie();
 
@@ -449,7 +547,7 @@ function preMain() {
 
 function postRun() {
   checkStackCookie();
-   // PThreads reuse the runtime from the main thread.
+  if ((ENVIRONMENT_IS_WASM_WORKER)) { return; } // PThreads reuse the runtime from the main thread.
 
   if (Module['postRun']) {
     if (typeof Module['postRun'] == 'function') Module['postRun'] = [Module['postRun']];
@@ -656,6 +754,7 @@ async function instantiateAsync(binary, binaryFile, imports) {
 }
 
 function getWasmImports() {
+  assignWasmImports();
   // prepare imports
   return {
     'env': wasmImports,
@@ -675,15 +774,12 @@ async function createWasm() {
 
     
 
-    wasmMemory = wasmExports['memory'];
-    
-    assert(wasmMemory, 'memory not found in wasm exports');
-    updateMemoryViews();
-
     wasmTable = wasmExports['__indirect_function_table'];
     
     assert(wasmTable, 'table not found in wasm exports');
 
+    // We now have the Wasm module loaded up, keep a reference to the compiled module so we can post it to the workers.
+    wasmModule = module;
     removeRunDependency('wasm-instantiate');
     return wasmExports;
   }
@@ -700,9 +796,7 @@ async function createWasm() {
     // receiveInstance() will swap in the exports (to Module.asm) so they can be called
     assert(Module === trueModule, 'the Module object should not be replaced during async compilation - perhaps the order of HTML elements is wrong?');
     trueModule = null;
-    // TODO: Due to Closure regression https://github.com/google/closure-compiler/issues/3193, the above line no longer optimizes out down to the following line.
-    // When the regression is fixed, can restore the above PTHREADS-enabled path.
-    return receiveInstance(result['instance']);
+    return receiveInstance(result['instance'], result['module']);
   }
 
   var info = getWasmImports();
@@ -723,6 +817,17 @@ async function createWasm() {
         err(`Module.instantiateWasm callback failed with error: ${e}`);
         reject(e);
       }
+    });
+  }
+
+  if ((ENVIRONMENT_IS_WASM_WORKER)) {
+    return new Promise((resolve) => {
+      wasmModuleReceived = (module) => {
+        // Instantiate from the module posted from the main thread.
+        // We can just use sync instantiation in the worker.
+        var instance = new WebAssembly.Instance(module, getWasmImports());
+        resolve(receiveInstance(instance, module));
+      };
     });
   }
 
@@ -750,6 +855,134 @@ async function createWasm() {
         this.status = status;
       }
     }
+
+  var _wasmWorkerDelayedMessageQueue = [];
+  
+  var handleException = (e) => {
+      // Certain exception types we do not treat as errors since they are used for
+      // internal control flow.
+      // 1. ExitStatus, which is thrown by exit()
+      // 2. "unwind", which is thrown by emscripten_unwind_to_js_event_loop() and others
+      //    that wish to return to JS event loop.
+      if (e instanceof ExitStatus || e == 'unwind') {
+        return EXITSTATUS;
+      }
+      checkStackCookie();
+      if (e instanceof WebAssembly.RuntimeError) {
+        if (_emscripten_stack_get_current() <= 0) {
+          err('Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 65536)');
+        }
+      }
+      quit_(1, e);
+    };
+  
+  
+  var runtimeKeepaliveCounter = 0;
+  var keepRuntimeAlive = () => noExitRuntime || runtimeKeepaliveCounter > 0;
+  var _proc_exit = (code) => {
+      EXITSTATUS = code;
+      if (!keepRuntimeAlive()) {
+        Module['onExit']?.(code);
+        ABORT = true;
+      }
+      quit_(code, new ExitStatus(code));
+    };
+  
+  
+  /** @suppress {duplicate } */
+  /** @param {boolean|number=} implicit */
+  var exitJS = (status, implicit) => {
+      EXITSTATUS = status;
+  
+      checkUnflushedContent();
+  
+      // if exit() was called explicitly, warn the user if the runtime isn't actually being shut down
+      if (keepRuntimeAlive() && !implicit) {
+        var msg = `program exited (with status: ${status}), but keepRuntimeAlive() is set (counter=${runtimeKeepaliveCounter}) due to an async operation, so halting execution but not exiting the runtime or preventing further async execution (you can use emscripten_force_exit, if you want to force a true shutdown)`;
+        readyPromiseReject(msg);
+        err(msg);
+      }
+  
+      _proc_exit(status);
+    };
+  var _exit = exitJS;
+  
+  
+  var maybeExit = () => {
+      if (!keepRuntimeAlive()) {
+        try {
+          _exit(EXITSTATUS);
+        } catch (e) {
+          handleException(e);
+        }
+      }
+    };
+  var callUserCallback = (func) => {
+      if (ABORT) {
+        err('user callback triggered after runtime exited or application aborted.  Ignoring.');
+        return;
+      }
+      try {
+        func();
+        maybeExit();
+      } catch (e) {
+        handleException(e);
+      }
+    };
+  
+  var wasmTableMirror = [];
+  
+  /** @type {WebAssembly.Table} */
+  var wasmTable;
+  var getWasmTableEntry = (funcPtr) => {
+      var func = wasmTableMirror[funcPtr];
+      if (!func) {
+        /** @suppress {checkTypes} */
+        wasmTableMirror[funcPtr] = func = wasmTable.get(funcPtr);
+      }
+      /** @suppress {checkTypes} */
+      assert(wasmTable.get(funcPtr) == func, 'JavaScript-side Wasm function table mirror is out of date!');
+      return func;
+    };
+  var _wasmWorkerRunPostMessage = (e) => {
+      // '_wsc' is short for 'wasm call', trying to use an identifier name that
+      // will never conflict with user code
+      let data = e.data;
+      let wasmCall = data['_wsc'];
+      wasmCall && callUserCallback(() => getWasmTableEntry(wasmCall)(...data['x']));
+    };
+  
+  var _wasmWorkerAppendToQueue = (e) => {
+      _wasmWorkerDelayedMessageQueue.push(e);
+    };
+  
+  var _wasmWorkerInitializeRuntime = () => {
+      assert(wwParams);
+      assert(wwParams.wwID);
+      assert(wwParams.stackLowestAddress % 16 == 0);
+      assert(wwParams.stackSize % 16 == 0);
+  
+      // Wasm workers basically never exit their runtime
+      noExitRuntime = 1;
+  
+      // Run the C side Worker initialization for stack and TLS.
+      __emscripten_wasm_worker_initialize(wwParams.stackLowestAddress, wwParams.stackSize);
+  
+      // Write the stack cookie last, after we have set up the proper bounds and
+      // current position of the stack.
+      writeStackCookie();
+  
+        // The Wasm Worker runtime is now up, so we can start processing
+        // any postMessage function calls that have been received. Drop the temp
+        // message handler that queued any pending incoming postMessage function calls ...
+        removeEventListener('message', _wasmWorkerAppendToQueue);
+        // ... then flush whatever messages we may have already gotten in the queue,
+        //     and clear _wasmWorkerDelayedMessageQueue to undefined ...
+        _wasmWorkerDelayedMessageQueue = _wasmWorkerDelayedMessageQueue.forEach(_wasmWorkerRunPostMessage);
+        // ... and finally register the proper postMessage handler that immediately
+        // dispatches incoming function calls without queueing them.
+        addEventListener('message', _wasmWorkerRunPostMessage);
+    };
 
   var callRuntimeCallbacks = (callbacks) => {
       while (callbacks.length > 0) {
@@ -826,255 +1059,87 @@ async function createWasm() {
       }
     };
 
-  var wasmTableMirror = [];
+  var UTF8Decoder = typeof TextDecoder != 'undefined' ? new TextDecoder() : undefined;
   
-  /** @type {WebAssembly.Table} */
-  var wasmTable;
-  var getWasmTableEntry = (funcPtr) => {
-      var func = wasmTableMirror[funcPtr];
-      if (!func) {
-        /** @suppress {checkTypes} */
-        wasmTableMirror[funcPtr] = func = wasmTable.get(funcPtr);
+    /**
+     * Given a pointer 'idx' to a null-terminated UTF8-encoded string in the given
+     * array that contains uint8 values, returns a copy of that string as a
+     * Javascript String object.
+     * heapOrArray is either a regular array, or a JavaScript typed array view.
+     * @param {number=} idx
+     * @param {number=} maxBytesToRead
+     * @return {string}
+     */
+  var UTF8ArrayToString = (heapOrArray, idx = 0, maxBytesToRead = NaN) => {
+      var endIdx = idx + maxBytesToRead;
+      var endPtr = idx;
+      // TextDecoder needs to know the byte length in advance, it doesn't stop on
+      // null terminator by itself.  Also, use the length info to avoid running tiny
+      // strings through TextDecoder, since .subarray() allocates garbage.
+      // (As a tiny code save trick, compare endPtr against endIdx using a negation,
+      // so that undefined/NaN means Infinity)
+      while (heapOrArray[endPtr] && !(endPtr >= endIdx)) ++endPtr;
+  
+      // When using conditional TextDecoder, skip it for short strings as the overhead of the native call is not worth it.
+      if (endPtr - idx > 16 && heapOrArray.buffer && UTF8Decoder) {
+        return UTF8Decoder.decode(heapOrArray.buffer instanceof ArrayBuffer ? heapOrArray.subarray(idx, endPtr) : heapOrArray.slice(idx, endPtr));
       }
-      /** @suppress {checkTypes} */
-      assert(wasmTable.get(funcPtr) == func, 'JavaScript-side Wasm function table mirror is out of date!');
-      return func;
+      var str = '';
+      // If building with TextDecoder, we have already computed the string length
+      // above, so test loop end condition against that
+      while (idx < endPtr) {
+        // For UTF8 byte structure, see:
+        // http://en.wikipedia.org/wiki/UTF-8#Description
+        // https://www.ietf.org/rfc/rfc2279.txt
+        // https://tools.ietf.org/html/rfc3629
+        var u0 = heapOrArray[idx++];
+        if (!(u0 & 0x80)) { str += String.fromCharCode(u0); continue; }
+        var u1 = heapOrArray[idx++] & 63;
+        if ((u0 & 0xE0) == 0xC0) { str += String.fromCharCode(((u0 & 31) << 6) | u1); continue; }
+        var u2 = heapOrArray[idx++] & 63;
+        if ((u0 & 0xF0) == 0xE0) {
+          u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
+        } else {
+          if ((u0 & 0xF8) != 0xF0) warnOnce('Invalid UTF-8 leading byte ' + ptrToString(u0) + ' encountered when deserializing a UTF-8 string in wasm memory to a JS string!');
+          u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (heapOrArray[idx++] & 63);
+        }
+  
+        if (u0 < 0x10000) {
+          str += String.fromCharCode(u0);
+        } else {
+          var ch = u0 - 0x10000;
+          str += String.fromCharCode(0xD800 | (ch >> 10), 0xDC00 | (ch & 0x3FF));
+        }
+      }
+      return str;
     };
-  var ___call_sighandler = (fp, sig) => getWasmTableEntry(fp)(sig);
+  
+    /**
+     * Given a pointer 'ptr' to a null-terminated UTF8-encoded string in the
+     * emscripten HEAP, returns a copy of that string as a Javascript String object.
+     *
+     * @param {number} ptr
+     * @param {number=} maxBytesToRead - An optional length that specifies the
+     *   maximum number of bytes to read. You can omit this parameter to scan the
+     *   string until the first 0 byte. If maxBytesToRead is passed, and the string
+     *   at [ptr, ptr+maxBytesToReadr[ contains a null byte in the middle, then the
+     *   string will cut short at that byte index (i.e. maxBytesToRead will not
+     *   produce a string of exact length [ptr, ptr+maxBytesToRead[) N.B. mixing
+     *   frequent uses of UTF8ToString() with and without maxBytesToRead may throw
+     *   JS JIT optimizations off, so it is worth to consider consistently using one
+     * @return {string}
+     */
+  var UTF8ToString = (ptr, maxBytesToRead) => {
+      assert(typeof ptr == 'number', `UTF8ToString expects a number (got ${typeof ptr})`);
+      return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead) : '';
+    };
+  var ___assert_fail = (condition, filename, line, func) =>
+      abort(`Assertion failed: ${UTF8ToString(condition)}, at: ` + [filename ? UTF8ToString(filename) : 'unknown filename', line, func ? UTF8ToString(func) : 'unknown function']);
 
   var __abort_js = () =>
       abort('native code called abort()');
 
-  var getExecutableName = () => thisProgram || './this.program';
-  
-  var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
-      assert(typeof str === 'string', `stringToUTF8Array expects a string (got ${typeof str})`);
-      // Parameter maxBytesToWrite is not optional. Negative values, 0, null,
-      // undefined and false each don't write out any bytes.
-      if (!(maxBytesToWrite > 0))
-        return 0;
-  
-      var startIdx = outIdx;
-      var endIdx = outIdx + maxBytesToWrite - 1; // -1 for string null terminator.
-      for (var i = 0; i < str.length; ++i) {
-        // Gotcha: charCodeAt returns a 16-bit word that is a UTF-16 encoded code
-        // unit, not a Unicode code point of the character! So decode
-        // UTF16->UTF32->UTF8.
-        // See http://unicode.org/faq/utf_bom.html#utf16-3
-        // For UTF8 byte structure, see http://en.wikipedia.org/wiki/UTF-8#Description
-        // and https://www.ietf.org/rfc/rfc2279.txt
-        // and https://tools.ietf.org/html/rfc3629
-        var u = str.charCodeAt(i); // possibly a lead surrogate
-        if (u >= 0xD800 && u <= 0xDFFF) {
-          var u1 = str.charCodeAt(++i);
-          u = 0x10000 + ((u & 0x3FF) << 10) | (u1 & 0x3FF);
-        }
-        if (u <= 0x7F) {
-          if (outIdx >= endIdx) break;
-          heap[outIdx++] = u;
-        } else if (u <= 0x7FF) {
-          if (outIdx + 1 >= endIdx) break;
-          heap[outIdx++] = 0xC0 | (u >> 6);
-          heap[outIdx++] = 0x80 | (u & 63);
-        } else if (u <= 0xFFFF) {
-          if (outIdx + 2 >= endIdx) break;
-          heap[outIdx++] = 0xE0 | (u >> 12);
-          heap[outIdx++] = 0x80 | ((u >> 6) & 63);
-          heap[outIdx++] = 0x80 | (u & 63);
-        } else {
-          if (outIdx + 3 >= endIdx) break;
-          if (u > 0x10FFFF) warnOnce('Invalid Unicode code point ' + ptrToString(u) + ' encountered when serializing a JS string to a UTF-8 string in wasm memory! (Valid unicode code points should be in range 0-0x10FFFF).');
-          heap[outIdx++] = 0xF0 | (u >> 18);
-          heap[outIdx++] = 0x80 | ((u >> 12) & 63);
-          heap[outIdx++] = 0x80 | ((u >> 6) & 63);
-          heap[outIdx++] = 0x80 | (u & 63);
-        }
-      }
-      // Null-terminate the pointer to the buffer.
-      heap[outIdx] = 0;
-      return outIdx - startIdx;
-    };
-  var stringToUTF8 = (str, outPtr, maxBytesToWrite) => {
-      assert(typeof maxBytesToWrite == 'number', 'stringToUTF8(str, outPtr, maxBytesToWrite) is missing the third parameter that specifies the length of the output buffer!');
-      return stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
-    };
-  var __emscripten_get_progname = (str, len) => stringToUTF8(getExecutableName(), str, len);
-
-  var runtimeKeepaliveCounter = 0;
-  var __emscripten_runtime_keepalive_clear = () => {
-      noExitRuntime = false;
-      runtimeKeepaliveCounter = 0;
-    };
-
-  var timers = {
-  };
-  
-  var handleException = (e) => {
-      // Certain exception types we do not treat as errors since they are used for
-      // internal control flow.
-      // 1. ExitStatus, which is thrown by exit()
-      // 2. "unwind", which is thrown by emscripten_unwind_to_js_event_loop() and others
-      //    that wish to return to JS event loop.
-      if (e instanceof ExitStatus || e == 'unwind') {
-        return EXITSTATUS;
-      }
-      checkStackCookie();
-      if (e instanceof WebAssembly.RuntimeError) {
-        if (_emscripten_stack_get_current() <= 0) {
-          err('Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 65536)');
-        }
-      }
-      quit_(1, e);
-    };
-  
-  
-  var keepRuntimeAlive = () => noExitRuntime || runtimeKeepaliveCounter > 0;
-  var _proc_exit = (code) => {
-      EXITSTATUS = code;
-      if (!keepRuntimeAlive()) {
-        Module['onExit']?.(code);
-        ABORT = true;
-      }
-      quit_(code, new ExitStatus(code));
-    };
-  
-  
-  /** @suppress {duplicate } */
-  /** @param {boolean|number=} implicit */
-  var exitJS = (status, implicit) => {
-      EXITSTATUS = status;
-  
-      checkUnflushedContent();
-  
-      // if exit() was called explicitly, warn the user if the runtime isn't actually being shut down
-      if (keepRuntimeAlive() && !implicit) {
-        var msg = `program exited (with status: ${status}), but keepRuntimeAlive() is set (counter=${runtimeKeepaliveCounter}) due to an async operation, so halting execution but not exiting the runtime or preventing further async execution (you can use emscripten_force_exit, if you want to force a true shutdown)`;
-        readyPromiseReject(msg);
-        err(msg);
-      }
-  
-      _proc_exit(status);
-    };
-  var _exit = exitJS;
-  
-  
-  var maybeExit = () => {
-      if (!keepRuntimeAlive()) {
-        try {
-          _exit(EXITSTATUS);
-        } catch (e) {
-          handleException(e);
-        }
-      }
-    };
-  var callUserCallback = (func) => {
-      if (ABORT) {
-        err('user callback triggered after runtime exited or application aborted.  Ignoring.');
-        return;
-      }
-      try {
-        func();
-        maybeExit();
-      } catch (e) {
-        handleException(e);
-      }
-    };
-  
-  
   var _emscripten_get_now = () => performance.now();
-  var __setitimer_js = (which, timeout_ms) => {
-      // First, clear any existing timer.
-      if (timers[which]) {
-        clearTimeout(timers[which].id);
-        delete timers[which];
-      }
-  
-      // A timeout of zero simply cancels the current timeout so we have nothing
-      // more to do.
-      if (!timeout_ms) return 0;
-  
-      var id = setTimeout(() => {
-        assert(which in timers);
-        delete timers[which];
-        callUserCallback(() => __emscripten_timeout(which, _emscripten_get_now()));
-      }, timeout_ms);
-      timers[which] = { id, timeout_ms };
-      return 0;
-    };
-
-  
-  var lengthBytesUTF8 = (str) => {
-      var len = 0;
-      for (var i = 0; i < str.length; ++i) {
-        // Gotcha: charCodeAt returns a 16-bit word that is a UTF-16 encoded code
-        // unit, not a Unicode code point of the character! So decode
-        // UTF16->UTF32->UTF8.
-        // See http://unicode.org/faq/utf_bom.html#utf16-3
-        var c = str.charCodeAt(i); // possibly a lead surrogate
-        if (c <= 0x7F) {
-          len++;
-        } else if (c <= 0x7FF) {
-          len += 2;
-        } else if (c >= 0xD800 && c <= 0xDFFF) {
-          len += 4; ++i;
-        } else {
-          len += 3;
-        }
-      }
-      return len;
-    };
-  var __tzset_js = (timezone, daylight, std_name, dst_name) => {
-      // TODO: Use (malleable) environment variables instead of system settings.
-      var currentYear = new Date().getFullYear();
-      var winter = new Date(currentYear, 0, 1);
-      var summer = new Date(currentYear, 6, 1);
-      var winterOffset = winter.getTimezoneOffset();
-      var summerOffset = summer.getTimezoneOffset();
-  
-      // Local standard timezone offset. Local standard time is not adjusted for
-      // daylight savings.  This code uses the fact that getTimezoneOffset returns
-      // a greater value during Standard Time versus Daylight Saving Time (DST).
-      // Thus it determines the expected output during Standard Time, and it
-      // compares whether the output of the given date the same (Standard) or less
-      // (DST).
-      var stdTimezoneOffset = Math.max(winterOffset, summerOffset);
-  
-      // timezone is specified as seconds west of UTC ("The external variable
-      // `timezone` shall be set to the difference, in seconds, between
-      // Coordinated Universal Time (UTC) and local standard time."), the same
-      // as returned by stdTimezoneOffset.
-      // See http://pubs.opengroup.org/onlinepubs/009695399/functions/tzset.html
-      HEAPU32[((timezone)>>2)] = stdTimezoneOffset * 60;
-  
-      HEAP32[((daylight)>>2)] = Number(winterOffset != summerOffset);
-  
-      var extractZone = (timezoneOffset) => {
-        // Why inverse sign?
-        // Read here https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/getTimezoneOffset
-        var sign = timezoneOffset >= 0 ? "-" : "+";
-  
-        var absOffset = Math.abs(timezoneOffset)
-        var hours = String(Math.floor(absOffset / 60)).padStart(2, "0");
-        var minutes = String(absOffset % 60).padStart(2, "0");
-  
-        return `UTC${sign}${hours}${minutes}`;
-      }
-  
-      var winterName = extractZone(winterOffset);
-      var summerName = extractZone(summerOffset);
-      assert(winterName);
-      assert(summerName);
-      assert(lengthBytesUTF8(winterName) <= 16, `timezone name truncated to fit in TZNAME_MAX (${winterName})`);
-      assert(lengthBytesUTF8(summerName) <= 16, `timezone name truncated to fit in TZNAME_MAX (${summerName})`);
-      if (summerOffset < winterOffset) {
-        // Northern hemisphere
-        stringToUTF8(winterName, std_name, 17);
-        stringToUTF8(summerName, dst_name, 17);
-      } else {
-        stringToUTF8(winterName, dst_name, 17);
-        stringToUTF8(summerName, std_name, 17);
-      }
-    };
 
   var abortOnCannotGrowMemory = (requestedSize) => {
       abort(`Cannot enlarge memory arrays to size ${requestedSize} bytes (OOM). Either (1) compile with -sINITIAL_MEMORY=X with X higher than the current value ${HEAP8.length}, (2) compile with -sALLOW_MEMORY_GROWTH which allows increasing the size at runtime, or (3) if you want malloc to return NULL (0) instead of this abort, compile with -sABORTING_MALLOC=0`);
@@ -1084,64 +1149,6 @@ async function createWasm() {
       // With CAN_ADDRESS_2GB or MEMORY64, pointers are already unsigned.
       requestedSize >>>= 0;
       abortOnCannotGrowMemory(requestedSize);
-    };
-
-  var ENV = {
-  };
-  
-  var getEnvStrings = () => {
-      if (!getEnvStrings.strings) {
-        // Default values.
-        // Browser language detection #8751
-        var lang = ((typeof navigator == 'object' && navigator.languages && navigator.languages[0]) || 'C').replace('-', '_') + '.UTF-8';
-        var env = {
-          'USER': 'web_user',
-          'LOGNAME': 'web_user',
-          'PATH': '/',
-          'PWD': '/',
-          'HOME': '/home/web_user',
-          'LANG': lang,
-          '_': getExecutableName()
-        };
-        // Apply the user-provided values, if any.
-        for (var x in ENV) {
-          // x is a key in ENV; if ENV[x] is undefined, that means it was
-          // explicitly set to be so. We allow user code to do that to
-          // force variables with default values to remain unset.
-          if (ENV[x] === undefined) delete env[x];
-          else env[x] = ENV[x];
-        }
-        var strings = [];
-        for (var x in env) {
-          strings.push(`${x}=${env[x]}`);
-        }
-        getEnvStrings.strings = strings;
-      }
-      return getEnvStrings.strings;
-    };
-  
-  var _environ_get = (__environ, environ_buf) => {
-      var bufSize = 0;
-      var envp = 0;
-      for (var string of getEnvStrings()) {
-        var ptr = environ_buf + bufSize;
-        HEAPU32[(((__environ)+(envp))>>2)] = ptr;
-        bufSize += stringToUTF8(string, ptr, Infinity) + 1;
-        envp += 4;
-      }
-      return 0;
-    };
-
-  
-  var _environ_sizes_get = (penviron_count, penviron_buf_size) => {
-      var strings = getEnvStrings();
-      HEAPU32[((penviron_count)>>2)] = strings.length;
-      var bufSize = 0;
-      for (var string of strings) {
-        bufSize += lengthBytesUTF8(string) + 1;
-      }
-      HEAPU32[((penviron_buf_size)>>2)] = bufSize;
-      return 0;
     };
 
   var PATH = {
@@ -1207,7 +1214,9 @@ async function createWasm() {
   
   var initRandomFill = () => {
   
-      return (view) => crypto.getRandomValues(view);
+      // like with most Web APIs, we can't use Web Crypto API directly on shared memory,
+      // so we need to create an intermediate buffer and copy it to the destination
+      return (view) => view.set(crypto.getRandomValues(new Uint8Array(view.byteLength)));
     };
   var randomFill = (view) => {
       // Lazily init on the first invocation.
@@ -1271,64 +1280,77 @@ async function createWasm() {
   };
   
   
-  var UTF8Decoder = typeof TextDecoder != 'undefined' ? new TextDecoder() : undefined;
-  
-    /**
-     * Given a pointer 'idx' to a null-terminated UTF8-encoded string in the given
-     * array that contains uint8 values, returns a copy of that string as a
-     * Javascript String object.
-     * heapOrArray is either a regular array, or a JavaScript typed array view.
-     * @param {number=} idx
-     * @param {number=} maxBytesToRead
-     * @return {string}
-     */
-  var UTF8ArrayToString = (heapOrArray, idx = 0, maxBytesToRead = NaN) => {
-      var endIdx = idx + maxBytesToRead;
-      var endPtr = idx;
-      // TextDecoder needs to know the byte length in advance, it doesn't stop on
-      // null terminator by itself.  Also, use the length info to avoid running tiny
-      // strings through TextDecoder, since .subarray() allocates garbage.
-      // (As a tiny code save trick, compare endPtr against endIdx using a negation,
-      // so that undefined/NaN means Infinity)
-      while (heapOrArray[endPtr] && !(endPtr >= endIdx)) ++endPtr;
-  
-      // When using conditional TextDecoder, skip it for short strings as the overhead of the native call is not worth it.
-      if (endPtr - idx > 16 && heapOrArray.buffer && UTF8Decoder) {
-        return UTF8Decoder.decode(heapOrArray.subarray(idx, endPtr));
-      }
-      var str = '';
-      // If building with TextDecoder, we have already computed the string length
-      // above, so test loop end condition against that
-      while (idx < endPtr) {
-        // For UTF8 byte structure, see:
-        // http://en.wikipedia.org/wiki/UTF-8#Description
-        // https://www.ietf.org/rfc/rfc2279.txt
-        // https://tools.ietf.org/html/rfc3629
-        var u0 = heapOrArray[idx++];
-        if (!(u0 & 0x80)) { str += String.fromCharCode(u0); continue; }
-        var u1 = heapOrArray[idx++] & 63;
-        if ((u0 & 0xE0) == 0xC0) { str += String.fromCharCode(((u0 & 31) << 6) | u1); continue; }
-        var u2 = heapOrArray[idx++] & 63;
-        if ((u0 & 0xF0) == 0xE0) {
-          u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
-        } else {
-          if ((u0 & 0xF8) != 0xF0) warnOnce('Invalid UTF-8 leading byte ' + ptrToString(u0) + ' encountered when deserializing a UTF-8 string in wasm memory to a JS string!');
-          u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (heapOrArray[idx++] & 63);
-        }
-  
-        if (u0 < 0x10000) {
-          str += String.fromCharCode(u0);
-        } else {
-          var ch = u0 - 0x10000;
-          str += String.fromCharCode(0xD800 | (ch >> 10), 0xDC00 | (ch & 0x3FF));
-        }
-      }
-      return str;
-    };
   
   var FS_stdin_getChar_buffer = [];
   
+  var lengthBytesUTF8 = (str) => {
+      var len = 0;
+      for (var i = 0; i < str.length; ++i) {
+        // Gotcha: charCodeAt returns a 16-bit word that is a UTF-16 encoded code
+        // unit, not a Unicode code point of the character! So decode
+        // UTF16->UTF32->UTF8.
+        // See http://unicode.org/faq/utf_bom.html#utf16-3
+        var c = str.charCodeAt(i); // possibly a lead surrogate
+        if (c <= 0x7F) {
+          len++;
+        } else if (c <= 0x7FF) {
+          len += 2;
+        } else if (c >= 0xD800 && c <= 0xDFFF) {
+          len += 4; ++i;
+        } else {
+          len += 3;
+        }
+      }
+      return len;
+    };
   
+  var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
+      assert(typeof str === 'string', `stringToUTF8Array expects a string (got ${typeof str})`);
+      // Parameter maxBytesToWrite is not optional. Negative values, 0, null,
+      // undefined and false each don't write out any bytes.
+      if (!(maxBytesToWrite > 0))
+        return 0;
+  
+      var startIdx = outIdx;
+      var endIdx = outIdx + maxBytesToWrite - 1; // -1 for string null terminator.
+      for (var i = 0; i < str.length; ++i) {
+        // Gotcha: charCodeAt returns a 16-bit word that is a UTF-16 encoded code
+        // unit, not a Unicode code point of the character! So decode
+        // UTF16->UTF32->UTF8.
+        // See http://unicode.org/faq/utf_bom.html#utf16-3
+        // For UTF8 byte structure, see http://en.wikipedia.org/wiki/UTF-8#Description
+        // and https://www.ietf.org/rfc/rfc2279.txt
+        // and https://tools.ietf.org/html/rfc3629
+        var u = str.charCodeAt(i); // possibly a lead surrogate
+        if (u >= 0xD800 && u <= 0xDFFF) {
+          var u1 = str.charCodeAt(++i);
+          u = 0x10000 + ((u & 0x3FF) << 10) | (u1 & 0x3FF);
+        }
+        if (u <= 0x7F) {
+          if (outIdx >= endIdx) break;
+          heap[outIdx++] = u;
+        } else if (u <= 0x7FF) {
+          if (outIdx + 1 >= endIdx) break;
+          heap[outIdx++] = 0xC0 | (u >> 6);
+          heap[outIdx++] = 0x80 | (u & 63);
+        } else if (u <= 0xFFFF) {
+          if (outIdx + 2 >= endIdx) break;
+          heap[outIdx++] = 0xE0 | (u >> 12);
+          heap[outIdx++] = 0x80 | ((u >> 6) & 63);
+          heap[outIdx++] = 0x80 | (u & 63);
+        } else {
+          if (outIdx + 3 >= endIdx) break;
+          if (u > 0x10FFFF) warnOnce('Invalid Unicode code point ' + ptrToString(u) + ' encountered when serializing a JS string to a UTF-8 string in wasm memory! (Valid unicode code points should be in range 0-0x10FFFF).');
+          heap[outIdx++] = 0xF0 | (u >> 18);
+          heap[outIdx++] = 0x80 | ((u >> 12) & 63);
+          heap[outIdx++] = 0x80 | ((u >> 6) & 63);
+          heap[outIdx++] = 0x80 | (u & 63);
+        }
+      }
+      // Null-terminate the pointer to the buffer.
+      heap[outIdx] = 0;
+      return outIdx - startIdx;
+    };
   /** @type {function(string, boolean=, number=)} */
   var intArrayFromString = (stringy, dontAddNull, length) => {
       var len = length > 0 ? length : lengthBytesUTF8(stringy)+1;
@@ -1499,17 +1521,8 @@ async function createWasm() {
   };
   
   
-  var zeroMemory = (ptr, size) => HEAPU8.fill(0, ptr, ptr + size);
-  
-  var alignMemory = (size, alignment) => {
-      assert(alignment, "alignment argument is required");
-      return Math.ceil(size / alignment) * alignment;
-    };
   var mmapAlloc = (size) => {
-      size = alignMemory(size, 65536);
-      var ptr = _emscripten_builtin_memalign(65536, size);
-      if (ptr) zeroMemory(ptr, size);
-      return ptr;
+      abort('internal error: mmapAlloc called but `emscripten_builtin_memalign` native symbol not exported');
     };
   var MEMFS = {
   ops_table:null,
@@ -1905,26 +1918,6 @@ async function createWasm() {
   
   
   
-  
-    /**
-     * Given a pointer 'ptr' to a null-terminated UTF8-encoded string in the
-     * emscripten HEAP, returns a copy of that string as a Javascript String object.
-     *
-     * @param {number} ptr
-     * @param {number=} maxBytesToRead - An optional length that specifies the
-     *   maximum number of bytes to read. You can omit this parameter to scan the
-     *   string until the first 0 byte. If maxBytesToRead is passed, and the string
-     *   at [ptr, ptr+maxBytesToReadr[ contains a null byte in the middle, then the
-     *   string will cut short at that byte index (i.e. maxBytesToRead will not
-     *   produce a string of exact length [ptr, ptr+maxBytesToRead[) N.B. mixing
-     *   frequent uses of UTF8ToString() with and without maxBytesToRead may throw
-     *   JS JIT optimizations off, so it is worth to consider consistently using one
-     * @return {string}
-     */
-  var UTF8ToString = (ptr, maxBytesToRead) => {
-      assert(typeof ptr == 'number', `UTF8ToString expects a number (got ${typeof ptr})`);
-      return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead) : '';
-    };
   
   var strError = (errno) => UTF8ToString(_strerror(errno));
   
@@ -3894,7 +3887,6 @@ async function createWasm() {
 
 
 
-
   var getCFunc = (ident) => {
       var func = Module['_' + ident]; // closure exported function
       assert(func, 'Cannot call unknown function ' + ident + ', make sure it is exported');
@@ -3907,6 +3899,10 @@ async function createWasm() {
     };
   
   
+  var stringToUTF8 = (str, outPtr, maxBytesToWrite) => {
+      assert(typeof maxBytesToWrite == 'number', 'stringToUTF8(str, outPtr, maxBytesToWrite) is missing the third parameter that specifies the length of the output buffer!');
+      return stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
+    };
   
   var stackAlloc = (sz) => __emscripten_stack_alloc(sz);
   var stringToUTF8OnStack = (str) => {
@@ -3988,9 +3984,6 @@ async function createWasm() {
 
 
 
-
-
-
   FS.createPreloadedFile = FS_createPreloadedFile;
   FS.staticInit();;
 // End JS library code
@@ -4000,6 +3993,9 @@ async function createWasm() {
 // but before the wasm module is created.
 
 {
+  // With WASM_ESM_INTEGRATION this has to happen at the top level and not
+  // delayed until processModuleArgs.
+  initMemory();
 
   // Begin ATMODULES hooks
   if (Module['noExitRuntime']) noExitRuntime = Module['noExitRuntime'];
@@ -4026,18 +4022,33 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
   assert(typeof Module['TOTAL_MEMORY'] == 'undefined', 'Module.TOTAL_MEMORY has been renamed Module.INITIAL_MEMORY');
   assert(typeof Module['ENVIRONMENT'] == 'undefined', 'Module.ENVIRONMENT has been deprecated. To force the environment, use the ENVIRONMENT compile-time option (for example, -sENVIRONMENT=web or -sENVIRONMENT=node)');
   assert(typeof Module['STACK_SIZE'] == 'undefined', 'STACK_SIZE can no longer be set at runtime.  Use -sSTACK_SIZE at link time')
-  // If memory is defined in wasm, the user can't provide it, or set INITIAL_MEMORY
-  assert(typeof Module['wasmMemory'] == 'undefined', 'Use of `wasmMemory` detected.  Use -sIMPORTED_MEMORY to define wasmMemory externally');
-  assert(typeof Module['INITIAL_MEMORY'] == 'undefined', 'Detected runtime INITIAL_MEMORY setting.  Use -sIMPORTED_MEMORY to define wasmMemory dynamically');
 
 }
 
 // Begin runtime exports
+  Module['wasmMemory'] = wasmMemory;
   Module['ccall'] = ccall;
   Module['cwrap'] = cwrap;
+  Module['setValue'] = setValue;
+  Module['getValue'] = getValue;
   // End runtime exports
   // Begin JS library exports
   Module['ExitStatus'] = ExitStatus;
+  Module['_wasmWorkerInitializeRuntime'] = _wasmWorkerInitializeRuntime;
+  Module['_wasmWorkerDelayedMessageQueue'] = _wasmWorkerDelayedMessageQueue;
+  Module['_wasmWorkerRunPostMessage'] = _wasmWorkerRunPostMessage;
+  Module['callUserCallback'] = callUserCallback;
+  Module['handleException'] = handleException;
+  Module['maybeExit'] = maybeExit;
+  Module['_exit'] = _exit;
+  Module['exitJS'] = exitJS;
+  Module['_proc_exit'] = _proc_exit;
+  Module['keepRuntimeAlive'] = keepRuntimeAlive;
+  Module['runtimeKeepaliveCounter'] = runtimeKeepaliveCounter;
+  Module['getWasmTableEntry'] = getWasmTableEntry;
+  Module['wasmTableMirror'] = wasmTableMirror;
+  Module['wasmTable'] = wasmTable;
+  Module['_wasmWorkerAppendToQueue'] = _wasmWorkerAppendToQueue;
   Module['addOnPostRun'] = addOnPostRun;
   Module['onPostRuns'] = onPostRuns;
   Module['callRuntimeCallbacks'] = callRuntimeCallbacks;
@@ -4050,35 +4061,14 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
   Module['stackRestore'] = stackRestore;
   Module['stackSave'] = stackSave;
   Module['warnOnce'] = warnOnce;
-  Module['___call_sighandler'] = ___call_sighandler;
-  Module['getWasmTableEntry'] = getWasmTableEntry;
-  Module['wasmTableMirror'] = wasmTableMirror;
-  Module['wasmTable'] = wasmTable;
+  Module['___assert_fail'] = ___assert_fail;
+  Module['UTF8ToString'] = UTF8ToString;
+  Module['UTF8ArrayToString'] = UTF8ArrayToString;
+  Module['UTF8Decoder'] = UTF8Decoder;
   Module['__abort_js'] = __abort_js;
-  Module['__emscripten_get_progname'] = __emscripten_get_progname;
-  Module['getExecutableName'] = getExecutableName;
-  Module['stringToUTF8'] = stringToUTF8;
-  Module['stringToUTF8Array'] = stringToUTF8Array;
-  Module['__emscripten_runtime_keepalive_clear'] = __emscripten_runtime_keepalive_clear;
-  Module['runtimeKeepaliveCounter'] = runtimeKeepaliveCounter;
-  Module['__setitimer_js'] = __setitimer_js;
-  Module['timers'] = timers;
-  Module['callUserCallback'] = callUserCallback;
-  Module['handleException'] = handleException;
-  Module['maybeExit'] = maybeExit;
-  Module['_exit'] = _exit;
-  Module['exitJS'] = exitJS;
-  Module['_proc_exit'] = _proc_exit;
-  Module['keepRuntimeAlive'] = keepRuntimeAlive;
   Module['_emscripten_get_now'] = _emscripten_get_now;
-  Module['__tzset_js'] = __tzset_js;
-  Module['lengthBytesUTF8'] = lengthBytesUTF8;
   Module['_emscripten_resize_heap'] = _emscripten_resize_heap;
   Module['abortOnCannotGrowMemory'] = abortOnCannotGrowMemory;
-  Module['_environ_get'] = _environ_get;
-  Module['getEnvStrings'] = getEnvStrings;
-  Module['ENV'] = ENV;
-  Module['_environ_sizes_get'] = _environ_sizes_get;
   Module['_fd_close'] = _fd_close;
   Module['SYSCALLS'] = SYSCALLS;
   Module['PATH'] = PATH;
@@ -4087,15 +4077,13 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
   Module['initRandomFill'] = initRandomFill;
   Module['PATH_FS'] = PATH_FS;
   Module['TTY'] = TTY;
-  Module['UTF8ArrayToString'] = UTF8ArrayToString;
-  Module['UTF8Decoder'] = UTF8Decoder;
   Module['FS_stdin_getChar'] = FS_stdin_getChar;
   Module['FS_stdin_getChar_buffer'] = FS_stdin_getChar_buffer;
   Module['intArrayFromString'] = intArrayFromString;
+  Module['lengthBytesUTF8'] = lengthBytesUTF8;
+  Module['stringToUTF8Array'] = stringToUTF8Array;
   Module['MEMFS'] = MEMFS;
   Module['mmapAlloc'] = mmapAlloc;
-  Module['zeroMemory'] = zeroMemory;
-  Module['alignMemory'] = alignMemory;
   Module['FS_createPreloadedFile'] = FS_createPreloadedFile;
   Module['asyncLoad'] = asyncLoad;
   Module['FS_createDataFile'] = FS_createDataFile;
@@ -4104,7 +4092,6 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
   Module['FS_modeStringToFlags'] = FS_modeStringToFlags;
   Module['FS_getMode'] = FS_getMode;
   Module['strError'] = strError;
-  Module['UTF8ToString'] = UTF8ToString;
   Module['ERRNO_CODES'] = ERRNO_CODES;
   Module['_fd_read'] = _fd_read;
   Module['doReadv'] = doReadv;
@@ -4118,6 +4105,7 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
   Module['getCFunc'] = getCFunc;
   Module['writeArrayToMemory'] = writeArrayToMemory;
   Module['stringToUTF8OnStack'] = stringToUTF8OnStack;
+  Module['stringToUTF8'] = stringToUTF8;
   Module['stackAlloc'] = stackAlloc;
   Module['cwrap'] = cwrap;
   // End JS library exports
@@ -4127,40 +4115,32 @@ if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
 function checkIncomingModuleAPI() {
   ignoredModuleProp('fetchSettings');
 }
-var wasmImports = {
-  /** @export */
-  __call_sighandler: ___call_sighandler,
-  /** @export */
-  _abort_js: __abort_js,
-  /** @export */
-  _emscripten_get_progname: __emscripten_get_progname,
-  /** @export */
-  _emscripten_runtime_keepalive_clear: __emscripten_runtime_keepalive_clear,
-  /** @export */
-  _setitimer_js: __setitimer_js,
-  /** @export */
-  _tzset_js: __tzset_js,
-  /** @export */
-  emscripten_resize_heap: _emscripten_resize_heap,
-  /** @export */
-  environ_get: _environ_get,
-  /** @export */
-  environ_sizes_get: _environ_sizes_get,
-  /** @export */
-  fd_close: _fd_close,
-  /** @export */
-  fd_read: _fd_read,
-  /** @export */
-  fd_seek: _fd_seek,
-  /** @export */
-  fd_write: _fd_write,
-  /** @export */
-  proc_exit: _proc_exit
-};
-var wasmExports = await createWasm();
+  var wasmImports;
+  function assignWasmImports() {
+    wasmImports = {
+    /** @export */
+    __assert_fail: ___assert_fail,
+    /** @export */
+    _abort_js: __abort_js,
+    /** @export */
+    emscripten_get_now: _emscripten_get_now,
+    /** @export */
+    emscripten_resize_heap: _emscripten_resize_heap,
+    /** @export */
+    fd_close: _fd_close,
+    /** @export */
+    fd_read: _fd_read,
+    /** @export */
+    fd_seek: _fd_seek,
+    /** @export */
+    fd_write: _fd_write,
+    /** @export */
+    memory: wasmMemory
+  };
+  }
+  var wasmExports = await createWasm();
 // Imports from the Wasm binary.
 var ___wasm_call_ctors = createExportWrapper('__wasm_call_ctors', 0);
-var _malloc = createExportWrapper('malloc', 1);
 var _init_fact = Module['_init_fact'] = createExportWrapper('init_fact', 0);
 var _init_game = Module['_init_game'] = createExportWrapper('init_game', 1);
 var _playable_move = Module['_playable_move'] = createExportWrapper('playable_move', 4);
@@ -4181,13 +4161,15 @@ var _over = Module['_over'] = createExportWrapper('over', 1);
 var _hand_is_liquid = Module['_hand_is_liquid'] = createExportWrapper('hand_is_liquid', 2);
 var _collapse_piece = Module['_collapse_piece'] = createExportWrapper('collapse_piece', 4);
 var _get_hand_sizes = Module['_get_hand_sizes'] = createExportWrapper('get_hand_sizes', 1);
-var _free = createExportWrapper('free', 1);
-var _realloc = createExportWrapper('realloc', 2);
 var _fflush = createExportWrapper('fflush', 1);
 var _print_playing_moves = Module['_print_playing_moves'] = createExportWrapper('print_playing_moves', 2);
 var _print_picking_moves = Module['_print_picking_moves'] = createExportWrapper('print_picking_moves', 2);
 var _endgame_evaluation = Module['_endgame_evaluation'] = createExportWrapper('endgame_evaluation', 1);
 var _main = Module['_main'] = createExportWrapper('main', 2);
+var _get_fallback_ptr = Module['_get_fallback_ptr'] = createExportWrapper('get_fallback_ptr', 0);
+var _get_fallback = Module['_get_fallback'] = createExportWrapper('get_fallback', 0);
+var _set_fallback = Module['_set_fallback'] = createExportWrapper('set_fallback', 0);
+var _reset_fallback = Module['_reset_fallback'] = createExportWrapper('reset_fallback', 0);
 var _get_number_of_players = Module['_get_number_of_players'] = createExportWrapper('get_number_of_players', 0);
 var _get_pips = Module['_get_pips'] = createExportWrapper('get_pips', 0);
 var _get_current_player = Module['_get_current_player'] = createExportWrapper('get_current_player', 0);
@@ -4198,6 +4180,8 @@ var _set_turn = Module['_set_turn'] = createExportWrapper('set_turn', 2);
 var _get_turn = Module['_get_turn'] = createExportWrapper('get_turn', 1);
 var _alloc_int = Module['_alloc_int'] = createExportWrapper('alloc_int', 0);
 var _deref_int = Module['_deref_int'] = createExportWrapper('deref_int', 1);
+var _alloc_float = Module['_alloc_float'] = createExportWrapper('alloc_float', 0);
+var _deref_float = Module['_deref_float'] = createExportWrapper('deref_float', 1);
 var _alloc_max_move_arr = Module['_alloc_max_move_arr'] = createExportWrapper('alloc_max_move_arr', 0);
 var _alloc_move = Module['_alloc_move'] = createExportWrapper('alloc_move', 0);
 var _pick_all_boneyard = Module['_pick_all_boneyard'] = createExportWrapper('pick_all_boneyard', 1);
@@ -4209,7 +4193,7 @@ var _imperfect_pick_by_pointer = Module['_imperfect_pick_by_pointer'] = createEx
 var _get_snake = Module['_get_snake'] = createExportWrapper('get_snake', 1);
 var _populate_move_from_components = Module['_populate_move_from_components'] = createExportWrapper('populate_move_from_components', 4);
 var _populate_imperfect_picking_move = Module['_populate_imperfect_picking_move'] = createExportWrapper('populate_imperfect_picking_move', 2);
-var _populate_move_by_ai = Module['_populate_move_by_ai'] = createExportWrapper('populate_move_by_ai', 5);
+var _populate_move_by_ai = Module['_populate_move_by_ai'] = createExportWrapper('populate_move_by_ai', 7);
 var _get_left_of_move = Module['_get_left_of_move'] = createExportWrapper('get_left_of_move', 1);
 var _get_right_of_move = Module['_get_right_of_move'] = createExportWrapper('get_right_of_move', 1);
 var _get_type_of_move = Module['_get_type_of_move'] = createExportWrapper('get_type_of_move', 1);
@@ -4218,374 +4202,16 @@ var _get_RIGHT = Module['_get_RIGHT'] = createExportWrapper('get_RIGHT', 0);
 var _get_PERFECT_PICK = Module['_get_PERFECT_PICK'] = createExportWrapper('get_PERFECT_PICK', 0);
 var _get_IMPERFECT_PICK = Module['_get_IMPERFECT_PICK'] = createExportWrapper('get_IMPERFECT_PICK', 0);
 var _get_PASS = Module['_get_PASS'] = createExportWrapper('get_PASS', 0);
-var _emscripten_stack_get_end = wasmExports['emscripten_stack_get_end']
-var _emscripten_stack_get_base = wasmExports['emscripten_stack_get_base']
-var _memcpy = createExportWrapper('memcpy', 3);
-var _memcmp = createExportWrapper('memcmp', 3);
-var __emscripten_memcpy_bulkmem = Module['__emscripten_memcpy_bulkmem'] = createExportWrapper('_emscripten_memcpy_bulkmem', 3);
-var __emscripten_memset_bulkmem = Module['__emscripten_memset_bulkmem'] = createExportWrapper('_emscripten_memset_bulkmem', 3);
-var _emscripten_builtin_memalign = createExportWrapper('emscripten_builtin_memalign', 2);
-var _emscripten_stack_get_current = wasmExports['emscripten_stack_get_current']
-var _calloc = createExportWrapper('calloc', 2);
-var _fileno = createExportWrapper('fileno', 1);
-var _htons = createExportWrapper('htons', 1);
-var _ntohs = createExportWrapper('ntohs', 1);
-var _htonl = createExportWrapper('htonl', 1);
+var _emscripten_stack_get_end = () => (_emscripten_stack_get_end = wasmExports['emscripten_stack_get_end'])();
+var _emscripten_stack_get_base = () => (_emscripten_stack_get_base = wasmExports['emscripten_stack_get_base'])();
 var _strerror = createExportWrapper('strerror', 1);
-var __emscripten_timeout = createExportWrapper('_emscripten_timeout', 2);
-var _setThrew = createExportWrapper('setThrew', 2);
-var __emscripten_tempret_set = createExportWrapper('_emscripten_tempret_set', 1);
-var __emscripten_tempret_get = createExportWrapper('_emscripten_tempret_get', 0);
-var ___get_temp_ret = Module['___get_temp_ret'] = createExportWrapper('__get_temp_ret', 0);
-var ___set_temp_ret = Module['___set_temp_ret'] = createExportWrapper('__set_temp_ret', 1);
-var _getTempRet0 = Module['_getTempRet0'] = createExportWrapper('getTempRet0', 0);
-var _setTempRet0 = Module['_setTempRet0'] = createExportWrapper('setTempRet0', 1);
-var ___emutls_get_address = Module['___emutls_get_address'] = createExportWrapper('__emutls_get_address', 1);
-var _emscripten_stack_init = wasmExports['emscripten_stack_init']
-var _emscripten_stack_set_limits = Module['_emscripten_stack_set_limits'] = wasmExports['emscripten_stack_set_limits']
-var _emscripten_stack_get_free = wasmExports['emscripten_stack_get_free']
-var __emscripten_stack_restore = wasmExports['_emscripten_stack_restore']
-var __emscripten_stack_alloc = wasmExports['_emscripten_stack_alloc']
-var __ZNSt8bad_castD2Ev = Module['__ZNSt8bad_castD2Ev'] = createExportWrapper('_ZNSt8bad_castD2Ev', 1);
-var __ZdlPvm = Module['__ZdlPvm'] = createExportWrapper('_ZdlPvm', 2);
-var __Znwm = Module['__Znwm'] = createExportWrapper('_Znwm', 1);
-var __ZnamSt11align_val_t = Module['__ZnamSt11align_val_t'] = createExportWrapper('_ZnamSt11align_val_t', 2);
-var __ZdaPvSt11align_val_t = Module['__ZdaPvSt11align_val_t'] = createExportWrapper('_ZdaPvSt11align_val_t', 2);
-var __ZNSt13runtime_errorD2Ev = Module['__ZNSt13runtime_errorD2Ev'] = createExportWrapper('_ZNSt13runtime_errorD2Ev', 1);
-var __ZNKSt13runtime_error4whatEv = Module['__ZNKSt13runtime_error4whatEv'] = createExportWrapper('_ZNKSt13runtime_error4whatEv', 1);
-var __ZnwmSt11align_val_t = Module['__ZnwmSt11align_val_t'] = createExportWrapper('_ZnwmSt11align_val_t', 2);
-var __ZdlPvmSt11align_val_t = Module['__ZdlPvmSt11align_val_t'] = createExportWrapper('_ZdlPvmSt11align_val_t', 3);
-var ___cxa_pure_virtual = Module['___cxa_pure_virtual'] = createExportWrapper('__cxa_pure_virtual', 0);
-var ___cxa_uncaught_exceptions = Module['___cxa_uncaught_exceptions'] = createExportWrapper('__cxa_uncaught_exceptions', 0);
-var ___cxa_decrement_exception_refcount = createExportWrapper('__cxa_decrement_exception_refcount', 1);
-var ___cxa_increment_exception_refcount = createExportWrapper('__cxa_increment_exception_refcount', 1);
-var ___cxa_current_primary_exception = Module['___cxa_current_primary_exception'] = createExportWrapper('__cxa_current_primary_exception', 0);
-var __ZSt9terminatev = Module['__ZSt9terminatev'] = createExportWrapper('_ZSt9terminatev', 0);
-var ___cxa_rethrow_primary_exception = Module['___cxa_rethrow_primary_exception'] = createExportWrapper('__cxa_rethrow_primary_exception', 1);
-var __ZNSt9exceptionD2Ev = Module['__ZNSt9exceptionD2Ev'] = createExportWrapper('_ZNSt9exceptionD2Ev', 1);
-var __ZNSt11logic_errorD2Ev = Module['__ZNSt11logic_errorD2Ev'] = createExportWrapper('_ZNSt11logic_errorD2Ev', 1);
-var __ZNKSt11logic_error4whatEv = Module['__ZNKSt11logic_error4whatEv'] = createExportWrapper('_ZNKSt11logic_error4whatEv', 1);
-var __ZdaPv = Module['__ZdaPv'] = createExportWrapper('_ZdaPv', 1);
-var __Znam = Module['__Znam'] = createExportWrapper('_Znam', 1);
-var __ZSt15get_new_handlerv = Module['__ZSt15get_new_handlerv'] = createExportWrapper('_ZSt15get_new_handlerv', 0);
-var __ZdlPv = Module['__ZdlPv'] = createExportWrapper('_ZdlPv', 1);
-var __ZdaPvm = Module['__ZdaPvm'] = createExportWrapper('_ZdaPvm', 2);
-var __ZdlPvSt11align_val_t = Module['__ZdlPvSt11align_val_t'] = createExportWrapper('_ZdlPvSt11align_val_t', 2);
-var __ZdaPvmSt11align_val_t = Module['__ZdaPvmSt11align_val_t'] = createExportWrapper('_ZdaPvmSt11align_val_t', 3);
-var ___dynamic_cast = Module['___dynamic_cast'] = createExportWrapper('__dynamic_cast', 4);
-var ___cxa_bad_cast = Module['___cxa_bad_cast'] = createExportWrapper('__cxa_bad_cast', 0);
-var ___cxa_bad_typeid = Module['___cxa_bad_typeid'] = createExportWrapper('__cxa_bad_typeid', 0);
-var ___cxa_throw_bad_array_new_length = Module['___cxa_throw_bad_array_new_length'] = createExportWrapper('__cxa_throw_bad_array_new_length', 0);
-var __ZSt14set_unexpectedPFvvE = Module['__ZSt14set_unexpectedPFvvE'] = createExportWrapper('_ZSt14set_unexpectedPFvvE', 1);
-var __ZSt13set_terminatePFvvE = Module['__ZSt13set_terminatePFvvE'] = createExportWrapper('_ZSt13set_terminatePFvvE', 1);
-var __ZSt15set_new_handlerPFvvE = Module['__ZSt15set_new_handlerPFvvE'] = createExportWrapper('_ZSt15set_new_handlerPFvvE', 1);
-var ___cxa_demangle = createExportWrapper('__cxa_demangle', 4);
-var ___cxa_guard_acquire = Module['___cxa_guard_acquire'] = createExportWrapper('__cxa_guard_acquire', 1);
-var ___cxa_guard_release = Module['___cxa_guard_release'] = createExportWrapper('__cxa_guard_release', 1);
-var ___cxa_guard_abort = Module['___cxa_guard_abort'] = createExportWrapper('__cxa_guard_abort', 1);
-var __ZSt14get_unexpectedv = Module['__ZSt14get_unexpectedv'] = createExportWrapper('_ZSt14get_unexpectedv', 0);
-var __ZSt10unexpectedv = Module['__ZSt10unexpectedv'] = createExportWrapper('_ZSt10unexpectedv', 0);
-var __ZSt13get_terminatev = Module['__ZSt13get_terminatev'] = createExportWrapper('_ZSt13get_terminatev', 0);
-var ___cxa_uncaught_exception = Module['___cxa_uncaught_exception'] = createExportWrapper('__cxa_uncaught_exception', 0);
-var ___cxa_allocate_exception = Module['___cxa_allocate_exception'] = createExportWrapper('__cxa_allocate_exception', 1);
-var ___cxa_free_exception = Module['___cxa_free_exception'] = createExportWrapper('__cxa_free_exception', 1);
-var ___cxa_init_primary_exception = Module['___cxa_init_primary_exception'] = createExportWrapper('__cxa_init_primary_exception', 3);
-var ___cxa_thread_atexit = Module['___cxa_thread_atexit'] = createExportWrapper('__cxa_thread_atexit', 3);
-var ___cxa_deleted_virtual = Module['___cxa_deleted_virtual'] = createExportWrapper('__cxa_deleted_virtual', 0);
-var __ZNSt9type_infoD2Ev = Module['__ZNSt9type_infoD2Ev'] = createExportWrapper('_ZNSt9type_infoD2Ev', 1);
-var ___cxa_can_catch = createExportWrapper('__cxa_can_catch', 3);
-var ___cxa_get_exception_ptr = createExportWrapper('__cxa_get_exception_ptr', 1);
-var __ZNSt9exceptionD0Ev = Module['__ZNSt9exceptionD0Ev'] = createExportWrapper('_ZNSt9exceptionD0Ev', 1);
-var __ZNSt9exceptionD1Ev = Module['__ZNSt9exceptionD1Ev'] = createExportWrapper('_ZNSt9exceptionD1Ev', 1);
-var __ZNKSt9exception4whatEv = Module['__ZNKSt9exception4whatEv'] = createExportWrapper('_ZNKSt9exception4whatEv', 1);
-var __ZNSt13bad_exceptionD0Ev = Module['__ZNSt13bad_exceptionD0Ev'] = createExportWrapper('_ZNSt13bad_exceptionD0Ev', 1);
-var __ZNSt13bad_exceptionD1Ev = Module['__ZNSt13bad_exceptionD1Ev'] = createExportWrapper('_ZNSt13bad_exceptionD1Ev', 1);
-var __ZNKSt13bad_exception4whatEv = Module['__ZNKSt13bad_exception4whatEv'] = createExportWrapper('_ZNKSt13bad_exception4whatEv', 1);
-var __ZNSt9bad_allocC2Ev = Module['__ZNSt9bad_allocC2Ev'] = createExportWrapper('_ZNSt9bad_allocC2Ev', 1);
-var __ZNSt9bad_allocD0Ev = Module['__ZNSt9bad_allocD0Ev'] = createExportWrapper('_ZNSt9bad_allocD0Ev', 1);
-var __ZNSt9bad_allocD1Ev = Module['__ZNSt9bad_allocD1Ev'] = createExportWrapper('_ZNSt9bad_allocD1Ev', 1);
-var __ZNKSt9bad_alloc4whatEv = Module['__ZNKSt9bad_alloc4whatEv'] = createExportWrapper('_ZNKSt9bad_alloc4whatEv', 1);
-var __ZNSt20bad_array_new_lengthC2Ev = Module['__ZNSt20bad_array_new_lengthC2Ev'] = createExportWrapper('_ZNSt20bad_array_new_lengthC2Ev', 1);
-var __ZNSt20bad_array_new_lengthD0Ev = Module['__ZNSt20bad_array_new_lengthD0Ev'] = createExportWrapper('_ZNSt20bad_array_new_lengthD0Ev', 1);
-var __ZNSt20bad_array_new_lengthD1Ev = Module['__ZNSt20bad_array_new_lengthD1Ev'] = createExportWrapper('_ZNSt20bad_array_new_lengthD1Ev', 1);
-var __ZNKSt20bad_array_new_length4whatEv = Module['__ZNKSt20bad_array_new_length4whatEv'] = createExportWrapper('_ZNKSt20bad_array_new_length4whatEv', 1);
-var __ZNSt13bad_exceptionD2Ev = Module['__ZNSt13bad_exceptionD2Ev'] = createExportWrapper('_ZNSt13bad_exceptionD2Ev', 1);
-var __ZNSt9bad_allocC1Ev = Module['__ZNSt9bad_allocC1Ev'] = createExportWrapper('_ZNSt9bad_allocC1Ev', 1);
-var __ZNSt9bad_allocD2Ev = Module['__ZNSt9bad_allocD2Ev'] = createExportWrapper('_ZNSt9bad_allocD2Ev', 1);
-var __ZNSt20bad_array_new_lengthC1Ev = Module['__ZNSt20bad_array_new_lengthC1Ev'] = createExportWrapper('_ZNSt20bad_array_new_lengthC1Ev', 1);
-var __ZNSt20bad_array_new_lengthD2Ev = Module['__ZNSt20bad_array_new_lengthD2Ev'] = createExportWrapper('_ZNSt20bad_array_new_lengthD2Ev', 1);
-var __ZNSt11logic_errorD0Ev = Module['__ZNSt11logic_errorD0Ev'] = createExportWrapper('_ZNSt11logic_errorD0Ev', 1);
-var __ZNSt11logic_errorD1Ev = Module['__ZNSt11logic_errorD1Ev'] = createExportWrapper('_ZNSt11logic_errorD1Ev', 1);
-var __ZNSt13runtime_errorD0Ev = Module['__ZNSt13runtime_errorD0Ev'] = createExportWrapper('_ZNSt13runtime_errorD0Ev', 1);
-var __ZNSt13runtime_errorD1Ev = Module['__ZNSt13runtime_errorD1Ev'] = createExportWrapper('_ZNSt13runtime_errorD1Ev', 1);
-var __ZNSt12domain_errorD0Ev = Module['__ZNSt12domain_errorD0Ev'] = createExportWrapper('_ZNSt12domain_errorD0Ev', 1);
-var __ZNSt12domain_errorD1Ev = Module['__ZNSt12domain_errorD1Ev'] = createExportWrapper('_ZNSt12domain_errorD1Ev', 1);
-var __ZNSt16invalid_argumentD0Ev = Module['__ZNSt16invalid_argumentD0Ev'] = createExportWrapper('_ZNSt16invalid_argumentD0Ev', 1);
-var __ZNSt16invalid_argumentD1Ev = Module['__ZNSt16invalid_argumentD1Ev'] = createExportWrapper('_ZNSt16invalid_argumentD1Ev', 1);
-var __ZNSt12length_errorD0Ev = Module['__ZNSt12length_errorD0Ev'] = createExportWrapper('_ZNSt12length_errorD0Ev', 1);
-var __ZNSt12length_errorD1Ev = Module['__ZNSt12length_errorD1Ev'] = createExportWrapper('_ZNSt12length_errorD1Ev', 1);
-var __ZNSt12out_of_rangeD0Ev = Module['__ZNSt12out_of_rangeD0Ev'] = createExportWrapper('_ZNSt12out_of_rangeD0Ev', 1);
-var __ZNSt12out_of_rangeD1Ev = Module['__ZNSt12out_of_rangeD1Ev'] = createExportWrapper('_ZNSt12out_of_rangeD1Ev', 1);
-var __ZNSt11range_errorD0Ev = Module['__ZNSt11range_errorD0Ev'] = createExportWrapper('_ZNSt11range_errorD0Ev', 1);
-var __ZNSt11range_errorD1Ev = Module['__ZNSt11range_errorD1Ev'] = createExportWrapper('_ZNSt11range_errorD1Ev', 1);
-var __ZNSt14overflow_errorD0Ev = Module['__ZNSt14overflow_errorD0Ev'] = createExportWrapper('_ZNSt14overflow_errorD0Ev', 1);
-var __ZNSt14overflow_errorD1Ev = Module['__ZNSt14overflow_errorD1Ev'] = createExportWrapper('_ZNSt14overflow_errorD1Ev', 1);
-var __ZNSt15underflow_errorD0Ev = Module['__ZNSt15underflow_errorD0Ev'] = createExportWrapper('_ZNSt15underflow_errorD0Ev', 1);
-var __ZNSt15underflow_errorD1Ev = Module['__ZNSt15underflow_errorD1Ev'] = createExportWrapper('_ZNSt15underflow_errorD1Ev', 1);
-var __ZNSt12domain_errorD2Ev = Module['__ZNSt12domain_errorD2Ev'] = createExportWrapper('_ZNSt12domain_errorD2Ev', 1);
-var __ZNSt16invalid_argumentD2Ev = Module['__ZNSt16invalid_argumentD2Ev'] = createExportWrapper('_ZNSt16invalid_argumentD2Ev', 1);
-var __ZNSt12length_errorD2Ev = Module['__ZNSt12length_errorD2Ev'] = createExportWrapper('_ZNSt12length_errorD2Ev', 1);
-var __ZNSt12out_of_rangeD2Ev = Module['__ZNSt12out_of_rangeD2Ev'] = createExportWrapper('_ZNSt12out_of_rangeD2Ev', 1);
-var __ZNSt11range_errorD2Ev = Module['__ZNSt11range_errorD2Ev'] = createExportWrapper('_ZNSt11range_errorD2Ev', 1);
-var __ZNSt14overflow_errorD2Ev = Module['__ZNSt14overflow_errorD2Ev'] = createExportWrapper('_ZNSt14overflow_errorD2Ev', 1);
-var __ZNSt15underflow_errorD2Ev = Module['__ZNSt15underflow_errorD2Ev'] = createExportWrapper('_ZNSt15underflow_errorD2Ev', 1);
-var __ZNSt9type_infoD0Ev = Module['__ZNSt9type_infoD0Ev'] = createExportWrapper('_ZNSt9type_infoD0Ev', 1);
-var __ZNSt9type_infoD1Ev = Module['__ZNSt9type_infoD1Ev'] = createExportWrapper('_ZNSt9type_infoD1Ev', 1);
-var __ZNSt8bad_castC2Ev = Module['__ZNSt8bad_castC2Ev'] = createExportWrapper('_ZNSt8bad_castC2Ev', 1);
-var __ZNSt8bad_castD0Ev = Module['__ZNSt8bad_castD0Ev'] = createExportWrapper('_ZNSt8bad_castD0Ev', 1);
-var __ZNSt8bad_castD1Ev = Module['__ZNSt8bad_castD1Ev'] = createExportWrapper('_ZNSt8bad_castD1Ev', 1);
-var __ZNKSt8bad_cast4whatEv = Module['__ZNKSt8bad_cast4whatEv'] = createExportWrapper('_ZNKSt8bad_cast4whatEv', 1);
-var __ZNSt10bad_typeidC2Ev = Module['__ZNSt10bad_typeidC2Ev'] = createExportWrapper('_ZNSt10bad_typeidC2Ev', 1);
-var __ZNSt10bad_typeidD2Ev = Module['__ZNSt10bad_typeidD2Ev'] = createExportWrapper('_ZNSt10bad_typeidD2Ev', 1);
-var __ZNSt10bad_typeidD0Ev = Module['__ZNSt10bad_typeidD0Ev'] = createExportWrapper('_ZNSt10bad_typeidD0Ev', 1);
-var __ZNSt10bad_typeidD1Ev = Module['__ZNSt10bad_typeidD1Ev'] = createExportWrapper('_ZNSt10bad_typeidD1Ev', 1);
-var __ZNKSt10bad_typeid4whatEv = Module['__ZNKSt10bad_typeid4whatEv'] = createExportWrapper('_ZNKSt10bad_typeid4whatEv', 1);
-var __ZNSt8bad_castC1Ev = Module['__ZNSt8bad_castC1Ev'] = createExportWrapper('_ZNSt8bad_castC1Ev', 1);
-var __ZNSt10bad_typeidC1Ev = Module['__ZNSt10bad_typeidC1Ev'] = createExportWrapper('_ZNSt10bad_typeidC1Ev', 1);
-var __ZTVN10__cxxabiv120__si_class_type_infoE = Module['__ZTVN10__cxxabiv120__si_class_type_infoE'] = 97832;
-var __ZTISt8bad_cast = Module['__ZTISt8bad_cast'] = 98848;
-var __ZTISt13runtime_error = Module['__ZTISt13runtime_error'] = 98632;
-var __ZTVN10__cxxabiv117__class_type_infoE = Module['__ZTVN10__cxxabiv117__class_type_infoE'] = 97792;
-var __ZTISt9exception = Module['__ZTISt9exception'] = 98160;
-var __ZTISt11logic_error = Module['__ZTISt11logic_error'] = 98396;
-var __ZTVN10__cxxabiv121__vmi_class_type_infoE = Module['__ZTVN10__cxxabiv121__vmi_class_type_infoE'] = 97924;
-var __ZTVSt11logic_error = Module['__ZTVSt11logic_error'] = 98304;
-var __ZTVSt9exception = Module['__ZTVSt9exception'] = 98140;
-var __ZTVSt13runtime_error = Module['__ZTVSt13runtime_error'] = 98324;
-var ___cxa_unexpected_handler = Module['___cxa_unexpected_handler'] = 99388;
-var ___cxa_terminate_handler = Module['___cxa_terminate_handler'] = 99384;
-var ___cxa_new_handler = Module['___cxa_new_handler'] = 119868;
-var __ZTIN10__cxxabiv116__shim_type_infoE = Module['__ZTIN10__cxxabiv116__shim_type_infoE'] = 95868;
-var __ZTIN10__cxxabiv117__class_type_infoE = Module['__ZTIN10__cxxabiv117__class_type_infoE'] = 95916;
-var __ZTIN10__cxxabiv117__pbase_type_infoE = Module['__ZTIN10__cxxabiv117__pbase_type_infoE'] = 95964;
-var __ZTIDn = Module['__ZTIDn'] = 96344;
-var __ZTIN10__cxxabiv119__pointer_type_infoE = Module['__ZTIN10__cxxabiv119__pointer_type_infoE'] = 96012;
-var __ZTIv = Module['__ZTIv'] = 96292;
-var __ZTIN10__cxxabiv120__function_type_infoE = Module['__ZTIN10__cxxabiv120__function_type_infoE'] = 96060;
-var __ZTIN10__cxxabiv129__pointer_to_member_type_infoE = Module['__ZTIN10__cxxabiv129__pointer_to_member_type_infoE'] = 96112;
-var __ZTISt9type_info = Module['__ZTISt9type_info'] = 98824;
-var __ZTSN10__cxxabiv116__shim_type_infoE = Module['__ZTSN10__cxxabiv116__shim_type_infoE'] = 95880;
-var __ZTSN10__cxxabiv117__class_type_infoE = Module['__ZTSN10__cxxabiv117__class_type_infoE'] = 95928;
-var __ZTSN10__cxxabiv117__pbase_type_infoE = Module['__ZTSN10__cxxabiv117__pbase_type_infoE'] = 95976;
-var __ZTSN10__cxxabiv119__pointer_type_infoE = Module['__ZTSN10__cxxabiv119__pointer_type_infoE'] = 96024;
-var __ZTSN10__cxxabiv120__function_type_infoE = Module['__ZTSN10__cxxabiv120__function_type_infoE'] = 96072;
-var __ZTSN10__cxxabiv129__pointer_to_member_type_infoE = Module['__ZTSN10__cxxabiv129__pointer_to_member_type_infoE'] = 96124;
-var __ZTVN10__cxxabiv116__shim_type_infoE = Module['__ZTVN10__cxxabiv116__shim_type_infoE'] = 96184;
-var __ZTVN10__cxxabiv123__fundamental_type_infoE = Module['__ZTVN10__cxxabiv123__fundamental_type_infoE'] = 96212;
-var __ZTIN10__cxxabiv123__fundamental_type_infoE = Module['__ZTIN10__cxxabiv123__fundamental_type_infoE'] = 96240;
-var __ZTSN10__cxxabiv123__fundamental_type_infoE = Module['__ZTSN10__cxxabiv123__fundamental_type_infoE'] = 96252;
-var __ZTSv = Module['__ZTSv'] = 96300;
-var __ZTIPv = Module['__ZTIPv'] = 96304;
-var __ZTVN10__cxxabiv119__pointer_type_infoE = Module['__ZTVN10__cxxabiv119__pointer_type_infoE'] = 98044;
-var __ZTSPv = Module['__ZTSPv'] = 96320;
-var __ZTIPKv = Module['__ZTIPKv'] = 96324;
-var __ZTSPKv = Module['__ZTSPKv'] = 96340;
-var __ZTSDn = Module['__ZTSDn'] = 96352;
-var __ZTIPDn = Module['__ZTIPDn'] = 96356;
-var __ZTSPDn = Module['__ZTSPDn'] = 96372;
-var __ZTIPKDn = Module['__ZTIPKDn'] = 96376;
-var __ZTSPKDn = Module['__ZTSPKDn'] = 96392;
-var __ZTIb = Module['__ZTIb'] = 96400;
-var __ZTSb = Module['__ZTSb'] = 96408;
-var __ZTIPb = Module['__ZTIPb'] = 96412;
-var __ZTSPb = Module['__ZTSPb'] = 96428;
-var __ZTIPKb = Module['__ZTIPKb'] = 96432;
-var __ZTSPKb = Module['__ZTSPKb'] = 96448;
-var __ZTIw = Module['__ZTIw'] = 96452;
-var __ZTSw = Module['__ZTSw'] = 96460;
-var __ZTIPw = Module['__ZTIPw'] = 96464;
-var __ZTSPw = Module['__ZTSPw'] = 96480;
-var __ZTIPKw = Module['__ZTIPKw'] = 96484;
-var __ZTSPKw = Module['__ZTSPKw'] = 96500;
-var __ZTIc = Module['__ZTIc'] = 96504;
-var __ZTSc = Module['__ZTSc'] = 96512;
-var __ZTIPc = Module['__ZTIPc'] = 96516;
-var __ZTSPc = Module['__ZTSPc'] = 96532;
-var __ZTIPKc = Module['__ZTIPKc'] = 96536;
-var __ZTSPKc = Module['__ZTSPKc'] = 96552;
-var __ZTIh = Module['__ZTIh'] = 96556;
-var __ZTSh = Module['__ZTSh'] = 96564;
-var __ZTIPh = Module['__ZTIPh'] = 96568;
-var __ZTSPh = Module['__ZTSPh'] = 96584;
-var __ZTIPKh = Module['__ZTIPKh'] = 96588;
-var __ZTSPKh = Module['__ZTSPKh'] = 96604;
-var __ZTIa = Module['__ZTIa'] = 96608;
-var __ZTSa = Module['__ZTSa'] = 96616;
-var __ZTIPa = Module['__ZTIPa'] = 96620;
-var __ZTSPa = Module['__ZTSPa'] = 96636;
-var __ZTIPKa = Module['__ZTIPKa'] = 96640;
-var __ZTSPKa = Module['__ZTSPKa'] = 96656;
-var __ZTIs = Module['__ZTIs'] = 96660;
-var __ZTSs = Module['__ZTSs'] = 96668;
-var __ZTIPs = Module['__ZTIPs'] = 96672;
-var __ZTSPs = Module['__ZTSPs'] = 96688;
-var __ZTIPKs = Module['__ZTIPKs'] = 96692;
-var __ZTSPKs = Module['__ZTSPKs'] = 96708;
-var __ZTIt = Module['__ZTIt'] = 96712;
-var __ZTSt = Module['__ZTSt'] = 96720;
-var __ZTIPt = Module['__ZTIPt'] = 96724;
-var __ZTSPt = Module['__ZTSPt'] = 96740;
-var __ZTIPKt = Module['__ZTIPKt'] = 96744;
-var __ZTSPKt = Module['__ZTSPKt'] = 96760;
-var __ZTIi = Module['__ZTIi'] = 96764;
-var __ZTSi = Module['__ZTSi'] = 96772;
-var __ZTIPi = Module['__ZTIPi'] = 96776;
-var __ZTSPi = Module['__ZTSPi'] = 96792;
-var __ZTIPKi = Module['__ZTIPKi'] = 96796;
-var __ZTSPKi = Module['__ZTSPKi'] = 96812;
-var __ZTIj = Module['__ZTIj'] = 96816;
-var __ZTSj = Module['__ZTSj'] = 96824;
-var __ZTIPj = Module['__ZTIPj'] = 96828;
-var __ZTSPj = Module['__ZTSPj'] = 96844;
-var __ZTIPKj = Module['__ZTIPKj'] = 96848;
-var __ZTSPKj = Module['__ZTSPKj'] = 96864;
-var __ZTIl = Module['__ZTIl'] = 96868;
-var __ZTSl = Module['__ZTSl'] = 96876;
-var __ZTIPl = Module['__ZTIPl'] = 96880;
-var __ZTSPl = Module['__ZTSPl'] = 96896;
-var __ZTIPKl = Module['__ZTIPKl'] = 96900;
-var __ZTSPKl = Module['__ZTSPKl'] = 96916;
-var __ZTIm = Module['__ZTIm'] = 96920;
-var __ZTSm = Module['__ZTSm'] = 96928;
-var __ZTIPm = Module['__ZTIPm'] = 96932;
-var __ZTSPm = Module['__ZTSPm'] = 96948;
-var __ZTIPKm = Module['__ZTIPKm'] = 96952;
-var __ZTSPKm = Module['__ZTSPKm'] = 96968;
-var __ZTIx = Module['__ZTIx'] = 96972;
-var __ZTSx = Module['__ZTSx'] = 96980;
-var __ZTIPx = Module['__ZTIPx'] = 96984;
-var __ZTSPx = Module['__ZTSPx'] = 97000;
-var __ZTIPKx = Module['__ZTIPKx'] = 97004;
-var __ZTSPKx = Module['__ZTSPKx'] = 97020;
-var __ZTIy = Module['__ZTIy'] = 97024;
-var __ZTSy = Module['__ZTSy'] = 97032;
-var __ZTIPy = Module['__ZTIPy'] = 97036;
-var __ZTSPy = Module['__ZTSPy'] = 97052;
-var __ZTIPKy = Module['__ZTIPKy'] = 97056;
-var __ZTSPKy = Module['__ZTSPKy'] = 97072;
-var __ZTIn = Module['__ZTIn'] = 97076;
-var __ZTSn = Module['__ZTSn'] = 97084;
-var __ZTIPn = Module['__ZTIPn'] = 97088;
-var __ZTSPn = Module['__ZTSPn'] = 97104;
-var __ZTIPKn = Module['__ZTIPKn'] = 97108;
-var __ZTSPKn = Module['__ZTSPKn'] = 97124;
-var __ZTIo = Module['__ZTIo'] = 97128;
-var __ZTSo = Module['__ZTSo'] = 97136;
-var __ZTIPo = Module['__ZTIPo'] = 97140;
-var __ZTSPo = Module['__ZTSPo'] = 97156;
-var __ZTIPKo = Module['__ZTIPKo'] = 97160;
-var __ZTSPKo = Module['__ZTSPKo'] = 97176;
-var __ZTIDh = Module['__ZTIDh'] = 97180;
-var __ZTSDh = Module['__ZTSDh'] = 97188;
-var __ZTIPDh = Module['__ZTIPDh'] = 97192;
-var __ZTSPDh = Module['__ZTSPDh'] = 97208;
-var __ZTIPKDh = Module['__ZTIPKDh'] = 97212;
-var __ZTSPKDh = Module['__ZTSPKDh'] = 97228;
-var __ZTIf = Module['__ZTIf'] = 97236;
-var __ZTSf = Module['__ZTSf'] = 97244;
-var __ZTIPf = Module['__ZTIPf'] = 97248;
-var __ZTSPf = Module['__ZTSPf'] = 97264;
-var __ZTIPKf = Module['__ZTIPKf'] = 97268;
-var __ZTSPKf = Module['__ZTSPKf'] = 97284;
-var __ZTId = Module['__ZTId'] = 97288;
-var __ZTSd = Module['__ZTSd'] = 97296;
-var __ZTIPd = Module['__ZTIPd'] = 97300;
-var __ZTSPd = Module['__ZTSPd'] = 97316;
-var __ZTIPKd = Module['__ZTIPKd'] = 97320;
-var __ZTSPKd = Module['__ZTSPKd'] = 97336;
-var __ZTIe = Module['__ZTIe'] = 97340;
-var __ZTSe = Module['__ZTSe'] = 97348;
-var __ZTIPe = Module['__ZTIPe'] = 97352;
-var __ZTSPe = Module['__ZTSPe'] = 97368;
-var __ZTIPKe = Module['__ZTIPKe'] = 97372;
-var __ZTSPKe = Module['__ZTSPKe'] = 97388;
-var __ZTIg = Module['__ZTIg'] = 97392;
-var __ZTSg = Module['__ZTSg'] = 97400;
-var __ZTIPg = Module['__ZTIPg'] = 97404;
-var __ZTSPg = Module['__ZTSPg'] = 97420;
-var __ZTIPKg = Module['__ZTIPKg'] = 97424;
-var __ZTSPKg = Module['__ZTSPKg'] = 97440;
-var __ZTIDu = Module['__ZTIDu'] = 97444;
-var __ZTSDu = Module['__ZTSDu'] = 97452;
-var __ZTIPDu = Module['__ZTIPDu'] = 97456;
-var __ZTSPDu = Module['__ZTSPDu'] = 97472;
-var __ZTIPKDu = Module['__ZTIPKDu'] = 97476;
-var __ZTSPKDu = Module['__ZTSPKDu'] = 97492;
-var __ZTIDs = Module['__ZTIDs'] = 97500;
-var __ZTSDs = Module['__ZTSDs'] = 97508;
-var __ZTIPDs = Module['__ZTIPDs'] = 97512;
-var __ZTSPDs = Module['__ZTSPDs'] = 97528;
-var __ZTIPKDs = Module['__ZTIPKDs'] = 97532;
-var __ZTSPKDs = Module['__ZTSPKDs'] = 97548;
-var __ZTIDi = Module['__ZTIDi'] = 97556;
-var __ZTSDi = Module['__ZTSDi'] = 97564;
-var __ZTIPDi = Module['__ZTIPDi'] = 97568;
-var __ZTSPDi = Module['__ZTSPDi'] = 97584;
-var __ZTIPKDi = Module['__ZTIPKDi'] = 97588;
-var __ZTSPKDi = Module['__ZTSPKDi'] = 97604;
-var __ZTVN10__cxxabiv117__array_type_infoE = Module['__ZTVN10__cxxabiv117__array_type_infoE'] = 97612;
-var __ZTIN10__cxxabiv117__array_type_infoE = Module['__ZTIN10__cxxabiv117__array_type_infoE'] = 97640;
-var __ZTSN10__cxxabiv117__array_type_infoE = Module['__ZTSN10__cxxabiv117__array_type_infoE'] = 97652;
-var __ZTVN10__cxxabiv120__function_type_infoE = Module['__ZTVN10__cxxabiv120__function_type_infoE'] = 97688;
-var __ZTVN10__cxxabiv116__enum_type_infoE = Module['__ZTVN10__cxxabiv116__enum_type_infoE'] = 97716;
-var __ZTIN10__cxxabiv116__enum_type_infoE = Module['__ZTIN10__cxxabiv116__enum_type_infoE'] = 97744;
-var __ZTSN10__cxxabiv116__enum_type_infoE = Module['__ZTSN10__cxxabiv116__enum_type_infoE'] = 97756;
-var __ZTIN10__cxxabiv120__si_class_type_infoE = Module['__ZTIN10__cxxabiv120__si_class_type_infoE'] = 97872;
-var __ZTSN10__cxxabiv120__si_class_type_infoE = Module['__ZTSN10__cxxabiv120__si_class_type_infoE'] = 97884;
-var __ZTIN10__cxxabiv121__vmi_class_type_infoE = Module['__ZTIN10__cxxabiv121__vmi_class_type_infoE'] = 97964;
-var __ZTSN10__cxxabiv121__vmi_class_type_infoE = Module['__ZTSN10__cxxabiv121__vmi_class_type_infoE'] = 97976;
-var __ZTVN10__cxxabiv117__pbase_type_infoE = Module['__ZTVN10__cxxabiv117__pbase_type_infoE'] = 98016;
-var __ZTVN10__cxxabiv129__pointer_to_member_type_infoE = Module['__ZTVN10__cxxabiv129__pointer_to_member_type_infoE'] = 98072;
-var __ZTVSt9bad_alloc = Module['__ZTVSt9bad_alloc'] = 98100;
-var __ZTVSt20bad_array_new_length = Module['__ZTVSt20bad_array_new_length'] = 98120;
-var __ZTISt9bad_alloc = Module['__ZTISt9bad_alloc'] = 98236;
-var __ZTISt20bad_array_new_length = Module['__ZTISt20bad_array_new_length'] = 98264;
-var __ZTSSt9exception = Module['__ZTSSt9exception'] = 98168;
-var __ZTVSt13bad_exception = Module['__ZTVSt13bad_exception'] = 98184;
-var __ZTISt13bad_exception = Module['__ZTISt13bad_exception'] = 98204;
-var __ZTSSt13bad_exception = Module['__ZTSSt13bad_exception'] = 98216;
-var __ZTSSt9bad_alloc = Module['__ZTSSt9bad_alloc'] = 98248;
-var __ZTSSt20bad_array_new_length = Module['__ZTSSt20bad_array_new_length'] = 98276;
-var __ZTVSt12domain_error = Module['__ZTVSt12domain_error'] = 98344;
-var __ZTISt12domain_error = Module['__ZTISt12domain_error'] = 98364;
-var __ZTSSt12domain_error = Module['__ZTSSt12domain_error'] = 98376;
-var __ZTSSt11logic_error = Module['__ZTSSt11logic_error'] = 98408;
-var __ZTVSt16invalid_argument = Module['__ZTVSt16invalid_argument'] = 98424;
-var __ZTISt16invalid_argument = Module['__ZTISt16invalid_argument'] = 98444;
-var __ZTSSt16invalid_argument = Module['__ZTSSt16invalid_argument'] = 98456;
-var __ZTVSt12length_error = Module['__ZTVSt12length_error'] = 98480;
-var __ZTISt12length_error = Module['__ZTISt12length_error'] = 98500;
-var __ZTSSt12length_error = Module['__ZTSSt12length_error'] = 98512;
-var __ZTVSt12out_of_range = Module['__ZTVSt12out_of_range'] = 98532;
-var __ZTISt12out_of_range = Module['__ZTISt12out_of_range'] = 98552;
-var __ZTSSt12out_of_range = Module['__ZTSSt12out_of_range'] = 98564;
-var __ZTVSt11range_error = Module['__ZTVSt11range_error'] = 98584;
-var __ZTISt11range_error = Module['__ZTISt11range_error'] = 98604;
-var __ZTSSt11range_error = Module['__ZTSSt11range_error'] = 98616;
-var __ZTSSt13runtime_error = Module['__ZTSSt13runtime_error'] = 98644;
-var __ZTVSt14overflow_error = Module['__ZTVSt14overflow_error'] = 98664;
-var __ZTISt14overflow_error = Module['__ZTISt14overflow_error'] = 98684;
-var __ZTSSt14overflow_error = Module['__ZTSSt14overflow_error'] = 98696;
-var __ZTVSt15underflow_error = Module['__ZTVSt15underflow_error'] = 98716;
-var __ZTISt15underflow_error = Module['__ZTISt15underflow_error'] = 98736;
-var __ZTSSt15underflow_error = Module['__ZTSSt15underflow_error'] = 98748;
-var __ZTVSt8bad_cast = Module['__ZTVSt8bad_cast'] = 98768;
-var __ZTVSt10bad_typeid = Module['__ZTVSt10bad_typeid'] = 98788;
-var __ZTISt10bad_typeid = Module['__ZTISt10bad_typeid'] = 98872;
-var __ZTVSt9type_info = Module['__ZTVSt9type_info'] = 98808;
-var __ZTSSt9type_info = Module['__ZTSSt9type_info'] = 98832;
-var __ZTSSt8bad_cast = Module['__ZTSSt8bad_cast'] = 98860;
-var __ZTSSt10bad_typeid = Module['__ZTSSt10bad_typeid'] = 98884;
+var _emscripten_stack_init = () => (_emscripten_stack_init = wasmExports['emscripten_stack_init'])();
+var _emscripten_stack_get_free = () => (_emscripten_stack_get_free = wasmExports['emscripten_stack_get_free'])();
+var __emscripten_stack_restore = (a0) => (__emscripten_stack_restore = wasmExports['_emscripten_stack_restore'])(a0);
+var __emscripten_stack_alloc = (a0) => (__emscripten_stack_alloc = wasmExports['_emscripten_stack_alloc'])(a0);
+var _emscripten_stack_get_current = () => (_emscripten_stack_get_current = wasmExports['emscripten_stack_get_current'])();
+var __emscripten_wasm_worker_initialize = createExportWrapper('_emscripten_wasm_worker_initialize', 2);
+
 
 // include: postamble.js
 // === Auto-generated postamble setup entry stuff ===
@@ -4626,6 +4252,12 @@ function run() {
 
   if (runDependencies > 0) {
     dependenciesFulfilled = run;
+    return;
+  }
+
+  if ((ENVIRONMENT_IS_WASM_WORKER)) {
+    readyPromiseResolve(Module);
+    initRuntime();
     return;
   }
 
@@ -4768,3 +4400,6 @@ if (typeof exports === 'object' && typeof module === 'object') {
   module.exports.default = createModule;
 } else if (typeof define === 'function' && define['amd'])
   define([], () => createModule);
+var isWW = globalThis.self?.name == 'em-ww';
+// When running as a wasm worker, construct a new instance on startup
+isWW && createModule();

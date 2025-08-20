@@ -8,6 +8,7 @@
   "dependencies": {
     "@reduxjs/toolkit": "^2.2.0",
     "clsx": "^2.1.1",
+    "comlink": "^4.4.2",
     "detect-element-overflow": "^1.4.2",
     "framer-motion": "^11.3.21",
     "immer": "^10.1.1",
@@ -31,7 +32,7 @@
     "prettier": "^3.3.3",
     "prettier-plugin-tailwindcss": "^0.6.5",
     "tailwindcss": "^3.4.6",
-    "typescript": "^5.3.3"
+    "typescript": "5.9.0-beta"
   },
   "prettier": {
     "plugins": [

@@ -22,12 +22,11 @@ import {
 } from "@/lib/features/domino/dominoSlice";
 import { getPlayableSides } from "@/lib/features/domino/dominoUtils";
 import { USER } from "@/src/components/GameInitMenu";
-import "../DominoAiMenu/dominoWasmStore";
 import posthog from "posthog-js";
 import GameOverMenu from "../GameOverMenu";
 import { Move } from "@/lib/features/domino/dominoUtils";
 import Draggable from "react-draggable";
-
+import useDominoAi from "../DominoAiMenu/use-domino-ai";
 export type Gamemode = "14/14" | "7/7";
 
 export default function DominoPlayground() {
@@ -39,6 +38,7 @@ export default function DominoPlayground() {
   // TODO: make this autopass functionality a configurable ingame option, or atleast give enough feedback that a player has passed
   // After more thought, this is a good default because the purpose of this entire App is to be a GUI to a domino ai, not a multiplayer game, thats another rabbit hole (hint: P2P)
   // but visible feedback is still welcome...
+  // TODO: also, this should be a hook...
   React.useEffect(() => {
     const unsubscribe = dispatch(
       addAppListener({
@@ -97,7 +97,7 @@ export default function DominoPlayground() {
       }),
     );
     return unsubscribe;
-  }, [dispatch]);
+  }, []);
   const gameInfo = useAppSelector(selectGameInfo);
   let showAIMenu = false;
   if (typeof gameInfo !== "undefined") {
@@ -112,19 +112,8 @@ export default function DominoPlayground() {
       ).length > 0; // only show the AI menu for the USER and when they can play a move
   }
 
+  const { doIterativeDeepening, bestMove } = useDominoAi();
   const nodeRef = React.useRef(null);
-  const [bestMove, setBestMove] = React.useState<Move>();
-  React.useEffect(() => {
-    const unsubscribe = dispatch(
-      addAppListener({
-        actionCreator: playMove,
-        effect: async () => {
-          setBestMove(undefined);
-        },
-      }),
-    );
-    return unsubscribe;
-  }, [dispatch, setBestMove]);
 
   return (
     <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
@@ -163,15 +152,14 @@ export default function DominoPlayground() {
           ) : (
             <Draggable nodeRef={nodeRef}>
               <div ref={nodeRef}>
-                <DominoAiMenu
-                  className={
-                    showAIMenu
-                      ? "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
-                      : /* we hide the menu while still rendering it to preserve depth of search across turns */
-                        "hidden"
-                  }
-                  setBestMove={setBestMove}
-                />
+                {showAIMenu ? (
+                  <DominoAiMenu
+                    className={
+                      "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
+                    }
+                    doIterativeDeepening={doIterativeDeepening}
+                  />
+                ) : null}
               </div>
             </Draggable>
           )}

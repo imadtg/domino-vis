@@ -12,8 +12,8 @@ var ModuleConfig = {
   },
 };
 
-export async function createConfiguredModule() {
-  const Module = await createModule(ModuleConfig);
+export async function createConfiguredModule(Config = {}) {
+  const Module = await createModule({...ModuleConfig, ...Config});
   return Module;
 }
 

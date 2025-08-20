@@ -1,58 +1,62 @@
 "use client";
 import * as React from "react";
 
-import { useAppDispatch } from "@/lib/hooks";
-
-import { ModuleState } from "@/src/components/DominoAiMenu/dominoWasmStore";
-
 import { Move } from "@/lib/features/domino/dominoUtils";
 import Button from "../Button";
 import clsx from "clsx";
-import { getAiMove } from "./aiWorker";
-
-// this whole component would ideally be just a button and then, with iterative deepening, highlight a move in DominoTable.
-// perhaps we should add some global state / slice of highlighted move that we flush on every playMove
+import { AiSearchResult, IterativeDeepeningProgressInfo } from "./aiWorker";
 
 interface DominoAiMenuProps {
   className: string;
-  setBestMove: (move?: Move) => void;
+  doIterativeDeepening: (
+    onProgress: (
+      progressInfo: IterativeDeepeningProgressInfo,
+      signal: AbortSignal,
+    ) => Promise<void>,
+  ) => Promise<void>;
 }
 
-function DominoAiMenu({ className, setBestMove }: DominoAiMenuProps) {
-  const dispatch = useAppDispatch();
-  const [depth, setDepth] = React.useState("");
-  /*const [searchStatus, setSearchStatus] = React.useState<
-    "idle" | "searching" | "done"
-  >("idle");*/
-  const id = React.useId();
-  /*const aiWorkerRef = React.useRef<Worker>();
+function DominoAiMenu({ className, doIterativeDeepening }: DominoAiMenuProps) {
+  // TODO: use a useReducer for these? because they are tightly coupled...
+  const [iterativeDeepeningStatus, setIterativeDeepeningStatusStatus] =
+    React.useState<"ongoing" | "idle" | "finished">("idle");
+  const [latestSearchResult, setLatestSearchResult] =
+    React.useState<AiSearchResult>();
+  const [latestDepth, setLatestDepth] = React.useState<number>();
 
-  React.useEffect(() => {
-    console.log('this is')
-    aiWorkerRef.current = new Worker(new URL("./aiWorker.ts", import.meta.url));
-    aiWorkerRef.current.onmessage = (event: MessageEvent<Move>) =>
-      setBestMove(event.data)
-    return () => {
-      aiWorkerRef.current?.terminate();
-    };
-  }, []);
-
-  function startAiSearch(depth: number) {
-    aiWorkerRef.current?.postMessage(depth);
-  }*/
-
-  function submitMoveSearch(event: React.FormEvent<HTMLFormElement>) {
+  async function submitMoveSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    //startAiSearch(parseInt(depth));
-    if (
-      typeof ModuleState.Module === "undefined" ||
-      typeof ModuleState.game === "undefined"
-    ) {
+    await startIterativeDeepening();
+  }
+
+  async function startIterativeDeepening() {
+    if (iterativeDeepeningStatus === "ongoing") {
+      window.alert("An AI search is already ongoing!");
       return;
     }
-    setBestMove(
-      getAiMove(ModuleState.Module, ModuleState.game, parseInt(depth)),
-    );
+    setIterativeDeepeningStatusStatus("ongoing");
+    await doIterativeDeepening(async (progressInfo, signal) => {
+      if (signal.aborted) {
+        return;
+      }
+      switch (progressInfo.status) {
+        case "ongoing":
+          setLatestSearchResult(progressInfo.searchResult);
+          setLatestDepth(progressInfo.depth);
+          break;
+        case "interrupted":
+          // this is unreachable with how we are reporting progress right now
+          // and we shouldnt need it because we only interrupt the search as we pass the turn
+          // thus hiding this menu
+          setIterativeDeepeningStatusStatus("idle");
+          setLatestSearchResult(undefined);
+          setLatestDepth(undefined);
+          break;
+        case "finished":
+          setIterativeDeepeningStatusStatus("finished");
+          break;
+      }
+    });
   }
 
   return (
@@ -60,18 +64,26 @@ function DominoAiMenu({ className, setBestMove }: DominoAiMenuProps) {
       <form onSubmit={submitMoveSearch}>
         <fieldset className="flex flex-col gap-[8px] p-[8px]">
           <legend>Domino AI</legend>
-          <label htmlFor={`${id}-depth`}>Depth of search</label>
-          <input
-            id={`${id}-depth`}
-            type="text"
-            value={depth}
-            onChange={(event) => setDepth(event.target.value)}
-            placeholder="20"
-            pattern="[1-9][0-9]*"
-          />
-          <Button>Find best move!</Button>
+          <Button className="whitespace-nowrap">Find best move!</Button>
         </fieldset>
       </form>
+      {iterativeDeepeningStatus === "ongoing" ? (
+        <p className="whitespace-nowrap">Searching...</p>
+      ) : iterativeDeepeningStatus === "finished" ? (
+        <p className="whitespace-nowrap">Search finished!</p>
+      ) : null}
+      {typeof latestSearchResult !== "undefined" &&
+      latestSearchResult.status === "success" ? (
+        <>
+          <p className="whitespace-nowrap">Depth = {latestDepth}</p>
+          <p className="whitespace-nowrap">
+            Score = {latestSearchResult.score}
+          </p>
+          <p className="whitespace-nowrap">
+            Explored nodes = {latestSearchResult.numberOfExploredNodes}
+          </p>
+        </>
+      ) : null}
     </div>
   );
 }
