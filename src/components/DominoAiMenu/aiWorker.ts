@@ -171,6 +171,7 @@ function getAiMove(depth: number): AiSearchResult {
   function deref_c_float(ptr: number) {
     return Module._deref_float(ptr);
   }
+  Module._reset_fallback();
   const { movePtr, scorePtr, numberOfExploredNodesPtr } = _getAiMove(depth);
   if (Module._get_fallback()) {
     Module._reset_fallback();
@@ -212,6 +213,7 @@ async function doIterativeDeepening(
   function deref_c_float(ptr: number) {
     return Module._deref_float(ptr);
   }
+  Module._reset_fallback();
   const LEFT = Module._get_LEFT();
   const RIGHT = Module._get_RIGHT();
   let currentDepth = 1;
