@@ -26,8 +26,6 @@ interface AiWorkerContext {
   fallbackPtr: number;
 }
 
-export type AiSearchCancellationResult = "success" | "no ongoing search";
-
 export default function useDominoAi() {
   const dispatch = useAppDispatch();
   const aiWorkerContextRef = React.useRef<AiWorkerContext>();
@@ -164,25 +162,20 @@ export default function useDominoAi() {
     new AbortController(),
   );
 
-  function cancelAiSearch(): AiSearchCancellationResult {
+  function cancelAiSearch() {
     if (typeof aiWorkerContextRef.current === "undefined") {
       throw new Error("AI Worker is not ready!");
     }
-    console.log("Cancelling ai search!");
+    console.log("Cancelling ai search if ongoing!");
     const i32 = new Int32Array(aiWorkerContextRef.current.sab);
     const idx = aiWorkerContextRef.current.fallbackPtr >>> 2; // divide by 4 because we are converting a byte pointer to a 4 byte index
-    const prev = Atomics.exchange(i32, idx, 1);
-    if (prev === 1) {
-      console.log("Turns out, no search was ongoing!");
-      return "no ongoing search";
-    }
+    Atomics.store(i32, idx, 1);
     aiSearchAbortControllerRef.current.abort();
-    console.log("Search cancelled!");
-    return "success";
+    console.log("Search cancelled if was ongoing!");
   }
 
   const [aiSearchIsOngoing, setAiSearchIsOngoing] =
-    React.useState<boolean>(false); // this may be a performance bottleneck when we do iterative deepening...
+    React.useState<boolean>(false); // this may cause unnecessary rerenders if consumers of the hook do not use it.
 
   const [bestMove, setBestMove] = React.useState<Move>();
   React.useEffect(() => {
@@ -229,6 +222,11 @@ export default function useDominoAi() {
         // is this sufficient? do we not need to setup an onabort thing here?
         if (abortSignal.aborted) {
           return;
+        }
+        if (progressInfo.status === "interrupted") {
+          throw new Error(
+            "Impossible progress report passed the AbortSignal early return!",
+          );
         }
         if (progressInfo.status === "ongoing") {
           setBestMove(progressInfo.searchResult.bestMove);

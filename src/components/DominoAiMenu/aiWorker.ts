@@ -171,15 +171,11 @@ function getAiMove(depth: number): AiSearchResult {
   function deref_c_float(ptr: number) {
     return Module._deref_float(ptr);
   }
-  // I know that i really should use Atomics... FALLBACK serves to indicate whether no search is ongoing right now...
-  // a bit overloaded from its first purpose of just cancelling searches i know...
-  Module._reset_fallback();
   const { movePtr, scorePtr, numberOfExploredNodesPtr } = _getAiMove(depth);
   if (Module._get_fallback()) {
+    Module._reset_fallback();
     return { status: "aborted" };
   }
-  Module._set_fallback(); // again, i should really use Atomics... but FALLBACK right now still represents whether a search is ongoing...
-  // while also acting as a way to do early returns inside the search if this is set elsewhere (which triggers the if statement above)...
   const LEFT = Module._get_LEFT();
   const RIGHT = Module._get_RIGHT();
   const score = deref_c_float(scorePtr);
@@ -218,7 +214,6 @@ async function doIterativeDeepening(
   }
   const LEFT = Module._get_LEFT();
   const RIGHT = Module._get_RIGHT();
-  Module._reset_fallback();
   let currentDepth = 1;
   let lastNumberOfExploredNodes;
   let currentNumberOfExploredNodes = 0;
@@ -227,6 +222,7 @@ async function doIterativeDeepening(
     const { movePtr, scorePtr, numberOfExploredNodesPtr } =
       _getAiMove(currentDepth);
     if (Module._get_fallback()) {
+      Module._reset_fallback();
       await onProgress({ status: "interrupted" });
       return;
     }
@@ -253,7 +249,6 @@ async function doIterativeDeepening(
     lastNumberOfExploredNodes = currentNumberOfExploredNodes;
     currentNumberOfExploredNodes = searchResult.numberOfExploredNodes;
   } while (currentNumberOfExploredNodes > lastNumberOfExploredNodes);
-  Module._set_fallback();
   await onProgress({ status: "finished" });
 }
 
