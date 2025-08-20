@@ -112,7 +112,7 @@ export default function DominoPlayground() {
       ).length > 0; // only show the AI menu for the USER and when they can play a move
   }
 
-  const { doIterativeDeepening, cancelAiSearch, bestMove } = useDominoAi();
+  const { doIterativeDeepening, bestMove } = useDominoAi();
   const nodeRef = React.useRef(null);
 
   return (
