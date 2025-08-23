@@ -12,10 +12,11 @@ import {
   extractRight,
   newMovesContext,
   extractType,
-} from "@/public/wasm/cToJShelpers";
+} from "@/src/components/DominoAiMenu/cToJShelpers";
 import { USER } from "../GameInitMenu";
+import { DominoAiModule } from "@/src/components/DominoAiMenu/domino-c";
 
-let Module: any;
+let Module: DominoAiModule;
 let fallbackPtr: number;
 let game: number;
 let initialized = false;
