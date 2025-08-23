@@ -1,11 +1,11 @@
 import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
-import pluginReact from "eslint-plugin-react";
+import reactPlugin from "eslint-plugin-react";
+import eslintConfigPrettier from "eslint-config-prettier/flat";
 import { defineConfig, globalIgnores } from "eslint/config";
 
 export default defineConfig([
-  // global ignores applied first
   globalIgnores(["node_modules/**", ".next/**", "public/wasm/**", "dist/**"]),
 
   {
@@ -16,5 +16,7 @@ export default defineConfig([
   },
 
   tseslint.configs.recommended,
-  pluginReact.configs.flat.recommended,
+  reactPlugin.configs.flat.recommended,
+
+  eslintConfigPrettier,
 ]);
