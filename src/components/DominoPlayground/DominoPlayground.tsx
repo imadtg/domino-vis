@@ -96,7 +96,7 @@ export default function DominoPlayground() {
       }),
     );
     return unsubscribe;
-  }, []);
+  }, [dispatch]);
   const gameInfo = useAppSelector(selectGameInfo);
   let showAIMenu = false;
   if (typeof gameInfo !== "undefined") {
