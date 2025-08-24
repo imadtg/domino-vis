@@ -193,7 +193,7 @@ export function turnAround({ left, right, ...rest }: DominoPiece): DominoPiece {
 }
 
 export function getAllDominoes(): DominoPiece[] {
-  let dominoes: DominoPiece[] = [];
+  const dominoes: DominoPiece[] = [];
   // pieces are hardcoded to be of a double six set
   for (let i = 0; i <= 6; i++) {
     for (let j = 0; j <= i; j++) {
@@ -210,7 +210,7 @@ export function getPlayableSides(
   if (snake.length === 0) {
     return ["left", "right"];
   }
-  let sides = [] as Side[];
+  const sides = [] as Side[];
   if (snake[0].left === piece.right || snake[0].left === piece.left) {
     sides.push("left");
   }

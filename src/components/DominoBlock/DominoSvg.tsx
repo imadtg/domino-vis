@@ -57,7 +57,7 @@ function PipSvg({
   return <circle r={PIP_WIDTH} fill={color} cx={cx} cy={cy} {...delegated} />;
 }
 
-interface PipInfo extends PipAlignment {}
+type PipInfo = PipAlignment // for now, can be extended later by using an interface instead of a type alias
 
 interface PipGroupInfo {
   pipInfos: PipInfo[];

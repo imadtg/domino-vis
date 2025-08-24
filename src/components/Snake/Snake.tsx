@@ -2,7 +2,6 @@
 import * as React from "react";
 import {
   comparePieces,
-  turnAround,
   DominoPiece,
   Side,
 } from "@/lib/features/domino/dominoUtils";
@@ -48,20 +47,6 @@ function Snake({
       setFirstPiece(snake[0]);
     }
   }, [firstPiece, snake]);
-
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "ArrowLeft") {
-        pushSnakeLeft();
-      } else if (event.key === "ArrowRight") {
-        pushSnakeRight();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [pushSnakeLeft, pushSnakeRight]);
 
   // relative indices of pieces to know how to break the snake into segments at those indices.
   // priority of break is always to the right, ie breaking at [0|0] gives it to the right segment.
@@ -115,7 +100,7 @@ function Snake({
     }
   }
 
-  let segments: DominoPiece[][] = [];
+  const segments: DominoPiece[][] = [];
   let originSegmentIndex: number | undefined = undefined;
   let previousBreakpoint = -originPieceIndex;
   for (let i = 0; i < segmentBreakpoints.length; i++) {
@@ -271,7 +256,7 @@ function Snake({
     );
   }
 
-  function pushSnakeRight() {
+  const pushSnakeRight = React.useCallback(() => {
     if (originPieceIndex === 0) {
       return;
     }
@@ -283,9 +268,9 @@ function Snake({
           index + originPieceIndex - 1 < snake.length,
       ),
     );
-  }
+  }, [snake, originPieceIndex, segmentBreakpoints]);
 
-  function pushSnakeLeft() {
+  const pushSnakeLeft = React.useCallback(() => {
     if (originPieceIndex === snake.length - 1) {
       return;
     }
@@ -297,7 +282,21 @@ function Snake({
           index + originPieceIndex + 1 < snake.length,
       ),
     );
-  }
+  }, [snake, originPieceIndex, segmentBreakpoints]);
+
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") {
+        pushSnakeLeft();
+      } else if (event.key === "ArrowRight") {
+        pushSnakeRight();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [pushSnakeLeft, pushSnakeRight]);
 
   // TODO: fix framer motion rotation animation of DominoBlock breaking after the effect below triggers a rerender.
   // perhaps we can use skeleton pieces until this effect finishes then use correct pieces?
@@ -524,6 +523,7 @@ const SnakeSegment = React.forwardRef<HTMLDivElement, SnakeSegmentProps>(
     );
   },
 );
+SnakeSegment.displayName = "SnakeSegment";
 
 // anchor madness...
 const DominoBlockWrapper = styled.div<{ $anchorName?: string }>`

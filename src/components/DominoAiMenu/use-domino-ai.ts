@@ -72,7 +72,7 @@ export default function useDominoAi() {
       }),
     );
     return unsubscribe;
-  }, []);
+  }, [dispatch]);
 
   React.useEffect(() => {
     const unsubscribe = dispatch(
@@ -100,7 +100,7 @@ export default function useDominoAi() {
       }),
     );
     return unsubscribe;
-  }, []);
+  }, [dispatch]);
 
   React.useEffect(() => {
     const unsubscribe = dispatch(
@@ -116,7 +116,7 @@ export default function useDominoAi() {
       }),
     );
     return unsubscribe;
-  }, []);
+  }, [dispatch]);
 
   React.useEffect(() => {
     const unsubscribe = dispatch(
@@ -135,7 +135,7 @@ export default function useDominoAi() {
       }),
     );
     return unsubscribe;
-  }, []);
+  }, [dispatch]);
 
   React.useEffect(() => {
     const unsubscribe = dispatch(
@@ -156,14 +156,14 @@ export default function useDominoAi() {
       }),
     );
     return unsubscribe;
-  }, []);
+  }, [dispatch]);
 
   // this is used to allow us to ignore stale progress reports from the AI worker in the onProgressWrapper below
   const aiSearchAbortControllerRef = React.useRef<AbortController>(
     new AbortController(),
   );
 
-  function cancelAiSearch() {
+  const cancelAiSearch = React.useCallback(() => {
     if (typeof aiWorkerContextRef.current === "undefined") {
       throw new Error("AI Worker is not ready!");
     }
@@ -174,7 +174,7 @@ export default function useDominoAi() {
     aiSearchAbortControllerRef.current.abort();
     aiSearchAbortControllerRef.current = new AbortController();
     console.log("Search cancelled if was ongoing!");
-  }
+  }, []);
 
   const [aiSearchIsOngoing, setAiSearchIsOngoing] =
     React.useState<boolean>(false); // this may cause unnecessary rerenders if consumers of the hook do not use it.
@@ -191,7 +191,7 @@ export default function useDominoAi() {
       }),
     );
     return unsubscribe;
-  }, [cancelAiSearch]);
+  }, [cancelAiSearch, dispatch]);
 
   return {
     getAiMove: async (depth: number) => {

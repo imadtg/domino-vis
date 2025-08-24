@@ -12,10 +12,11 @@ import {
   extractRight,
   newMovesContext,
   extractType,
-} from "@/public/wasm/cToJShelpers";
+} from "@/src/components/DominoAiMenu/cToJShelpers";
 import { USER } from "../GameInitMenu";
+import { DominoAiModule } from "@/src/components/DominoAiMenu/domino-c";
 
-let Module: any;
+let Module: DominoAiModule;
 let fallbackPtr: number;
 let game: number;
 let initialized = false;
@@ -125,10 +126,6 @@ function _getAiMove(depth: number): BareAiSearchContext {
     return Module._alloc_int();
   }
 
-  function deref_c_float(ptr: number) {
-    return Module._deref_float(ptr);
-  }
-
   function alloc_c_float() {
     return Module._alloc_float();
   }
@@ -177,7 +174,6 @@ function getAiMove(depth: number): AiSearchResult {
     Module._reset_fallback();
     return { status: "aborted" };
   }
-  const LEFT = Module._get_LEFT();
   const RIGHT = Module._get_RIGHT();
   const score = deref_c_float(scorePtr);
   const numberOfExploredNodes = deref_c_int(numberOfExploredNodesPtr);
@@ -214,7 +210,6 @@ async function doIterativeDeepening(
     return Module._deref_float(ptr);
   }
   Module._reset_fallback();
-  const LEFT = Module._get_LEFT();
   const RIGHT = Module._get_RIGHT();
   let currentDepth = 1;
   let lastNumberOfExploredNodes;

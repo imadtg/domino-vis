@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { StoreProvider } from "./StoreProvider";
 import "./globals.css";
-import Script from "next/script";
+import * as React from "react";
 import { MotionProvider } from "./MotionProvider";
 interface Props {
   readonly children: ReactNode;
