@@ -21,23 +21,37 @@ import Snake from "@/src/components/Snake";
 import Hand from "@/src/components/Hand";
 import Button from "../Button";
 import { USER } from "../GameInitMenu";
-import { Move, Side } from "@/lib/features/domino/dominoUtils";
+import {
+  Move,
+  Side,
+  DominoIngameInfo,
+} from "@/lib/features/domino/dominoUtils";
 
 interface DominoTableProps {
   bestMove?: Move;
 }
 
+interface InnerDominoTableProps extends DominoTableProps {
+  gameInfo: DominoIngameInfo;
+}
+
+// this wrapper is needed to avoid calling hooks conditionally whilst staying typesafe...
 function DominoTable({ bestMove }: DominoTableProps) {
-  const dispatch = useAppDispatch();
   const gameInfo = useAppSelector(selectGameInfo);
+
+  if (typeof gameInfo === "undefined") {
+    return null;
+  }
+
+  return <InnerDominoTable gameInfo={gameInfo} bestMove={bestMove} />;
+}
+
+function InnerDominoTable({ bestMove, gameInfo }: InnerDominoTableProps) {
+  const dispatch = useAppDispatch();
   const isOver = useAppSelector(selectIsOver);
   // TODO: add passing UI and endgame UI
   const [chosenPiece, setChosenPiece] = React.useState<DominoPiece>(); // this is used to store a piece that is playable on more than one side
   const [boneyardIsShown, setBoneyardIsShown] = React.useState<boolean>(false);
-
-  if (typeof gameInfo === "undefined") {
-    return;
-  }
 
   const { turn, hands, snake, boneyard } = gameInfo;
 
