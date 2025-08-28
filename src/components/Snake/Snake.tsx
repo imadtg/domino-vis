@@ -382,7 +382,12 @@ function Snake({
           debug={debug}
           onPieceClick={debug ? (piece) => toggleBreakpoint(piece) : undefined}
           highlightPiece={debug ? pieceIsBreakpoint : undefined}
-          highlightSide={highlightSide}
+          highlightSide={
+            (highlightSide === "left" && index === 0) ||
+            (highlightSide === "right" && index === segments.length - 1)
+              ? highlightSide
+              : undefined
+          }
           isAnchoredOnDouble={segmentIsAnchoredOnDouble(index)}
         />
       ))}
