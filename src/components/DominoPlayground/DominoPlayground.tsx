@@ -151,7 +151,7 @@ export default function DominoPlayground() {
           ) : (
             <Draggable nodeRef={nodeRef}>
               <div
-                className={"fixed bottom-0 right-[48px] top-0 my-auto h-1/2"}
+                className="fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
                 ref={nodeRef}
               >
                 {showAIMenu ? (
