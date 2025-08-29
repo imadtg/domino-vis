@@ -115,7 +115,7 @@ export default function DominoPlayground() {
   const nodeRef = React.useRef(null);
 
   return (
-    <div className="grid h-dvh place-items-center p-[16px] lg:p-[32px]">
+    <div className="grid h-dvh w-screen place-items-center p-[16px] lg:p-[32px]">
       {!gamemode ? (
         <div className="flex gap-2">
           <p>Choose mode: </p>
@@ -141,7 +141,7 @@ export default function DominoPlayground() {
       ) : gameStatus === "uninitialized" ? (
         <GameInitMenu gamemode={gamemode} />
       ) : (
-        <div className="flex h-full flex-row">
+        <>
           <DominoTable bestMove={bestMove} />
           {isOver ? (
             <GameOverMenu
@@ -150,19 +150,17 @@ export default function DominoPlayground() {
             />
           ) : (
             <Draggable nodeRef={nodeRef}>
-              <div ref={nodeRef}>
+              <div
+                className="fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
+                ref={nodeRef}
+              >
                 {showAIMenu ? (
-                  <DominoAiMenu
-                    className={
-                      "fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
-                    }
-                    doIterativeDeepening={doIterativeDeepening}
-                  />
+                  <DominoAiMenu doIterativeDeepening={doIterativeDeepening} />
                 ) : null}
               </div>
             </Draggable>
           )}
-        </div>
+        </>
       )}
     </div>
   );

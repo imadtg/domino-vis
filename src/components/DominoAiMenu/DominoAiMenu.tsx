@@ -6,7 +6,7 @@ import clsx from "clsx";
 import { AiSearchResult, IterativeDeepeningProgressInfo } from "./aiWorker";
 
 interface DominoAiMenuProps {
-  className: string;
+  className?: string;
   doIterativeDeepening: (
     onProgress: (
       progressInfo: IterativeDeepeningProgressInfo,
@@ -15,7 +15,10 @@ interface DominoAiMenuProps {
   ) => Promise<void>;
 }
 
-function DominoAiMenu({ className, doIterativeDeepening }: DominoAiMenuProps) {
+function DominoAiMenu({
+  className = "",
+  doIterativeDeepening,
+}: DominoAiMenuProps) {
   // TODO: use a useReducer for these? because they are tightly coupled...
   const [iterativeDeepeningStatus, setIterativeDeepeningStatusStatus] =
     React.useState<"ongoing" | "idle" | "finished">("idle");

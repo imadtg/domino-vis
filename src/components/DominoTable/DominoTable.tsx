@@ -130,7 +130,7 @@ function InnerDominoTable({ bestMove, gameInfo }: InnerDominoTableProps) {
   }, [dispatch, setChosenPiece]);
 
   return (
-    <div className="relative flex h-full flex-col items-center">
+    <div className="relative place-self-stretch flex h-full flex-col items-center">
       <Hand
         hand={hands[OPPONENT]}
         onPieceClick={(piece) =>
