@@ -218,14 +218,14 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
           state.gameInfo.hands[state.gameInfo.turn].pieces =
             state.gameInfo.hands[state.gameInfo.turn].pieces.concat(
               pickableBoneyardPieces.map((piece) => ({
-                piece,
+                piece: { ...piece, origin: state.gameInfo.turn },
                 presence: "possible",
               })),
             );
 
           // we downgrade certain presences to possible as they could have gone to the hand
           state.gameInfo.boneyard.pieces = state.gameInfo.boneyard.pieces.map(
-            ({ piece }) => ({ piece, presence: "possible" }),
+            (piecePresence) => ({ ...piecePresence, presence: "possible" }),
           );
         }
         state.gameInfo = collapse(state.gameInfo);
