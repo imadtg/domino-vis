@@ -115,7 +115,7 @@ export default function DominoPlayground() {
   const nodeRef = React.useRef(null);
 
   return (
-    <div className="grid h-dvh w-dvw place-items-center p-[16px] lg:p-[32px]">
+    <div className="grid h-dvh w-screen place-items-center p-[16px] lg:p-[32px]">
       {!gamemode ? (
         <div className="flex gap-2">
           <p>Choose mode: </p>
