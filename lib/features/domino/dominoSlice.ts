@@ -189,6 +189,7 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
         if (!isPlaying(state)) {
           return;
         }
+        // we remove all playable pieces from the hand
         state.gameInfo.hands[state.gameInfo.turn].pieces = state.gameInfo.hands[
           state.gameInfo.turn
         ].pieces.filter(
@@ -196,28 +197,37 @@ export const dominoSlice = partialGenericCreateAppSlice<DominoGame>()({
             getPlayableSides(state.gameInfo.snake, piece).length === 0,
         );
 
+        // we update the hand/boneyard sizes
         state.gameInfo.boneyard.count -= action.payload;
         state.gameInfo.hands[state.gameInfo.turn].count += action.payload;
-        const pickableBoneyardPieces = state.gameInfo.boneyard.pieces
-          .map(({ piece }) => piece)
-          .filter(
-            (piece) =>
-              // only pieces that cant be played because that is the definition of an imperfect pick, a pick which is not revealed
-              // a playable pick is played (and thus revealed) immediately and thus should be a perfect pick
-              getPlayableSides(state.gameInfo.snake, piece).length === 0 &&
-              !state.gameInfo.hands[state.gameInfo.turn].pieces.some(
-                ({ piece: handPiece }) => comparePieces(piece, handPiece),
-              ),
-          );
 
-        state.gameInfo.hands[state.gameInfo.turn].pieces = state.gameInfo.hands[
-          state.gameInfo.turn
-        ].pieces.concat(
-          pickableBoneyardPieces.map((piece) => ({
-            piece,
-            presence: "possible",
-          })),
-        );
+        if (action.payload > 0) {
+          const pickableBoneyardPieces = state.gameInfo.boneyard.pieces
+            .map(({ piece }) => piece)
+            .filter(
+              (piece) =>
+                // only pieces that cant be played because that is the definition of an imperfect pick, a pick which is not revealed
+                // a playable pick is played (and thus revealed) immediately and thus should be a perfect pick
+                getPlayableSides(state.gameInfo.snake, piece).length === 0 &&
+                !state.gameInfo.hands[state.gameInfo.turn].pieces.some(
+                  ({ piece: handPiece }) => comparePieces(piece, handPiece),
+                ),
+            );
+
+          // we inject possible presences from the boneyard
+          state.gameInfo.hands[state.gameInfo.turn].pieces =
+            state.gameInfo.hands[state.gameInfo.turn].pieces.concat(
+              pickableBoneyardPieces.map((piece) => ({
+                piece: { ...piece, origin: state.gameInfo.turn },
+                presence: "possible",
+              })),
+            );
+
+          // we downgrade certain presences to possible as they could have gone to the hand
+          state.gameInfo.boneyard.pieces = state.gameInfo.boneyard.pieces.map(
+            (piecePresence) => ({ ...piecePresence, presence: "possible" }),
+          );
+        }
         state.gameInfo = collapse(state.gameInfo);
         posthog.capture("boneyard imperfect picked finished", {
           stateAfter: state,
