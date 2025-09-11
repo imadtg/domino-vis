@@ -32,6 +32,9 @@ importers:
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
+      many-keys-map:
+        specifier: ^3.0.3
+        version: 3.0.3
       next:
         specifier: latest
         version: 15.3.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -1244,6 +1247,10 @@ packages:
 
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
+
+  many-keys-map@3.0.3:
+    resolution: {integrity: sha512-1DiZmDHPXMBgMRjeUtHy1q1VYmeJscHxhIAexX9z/zjRMP80+0ETuPfssi8z+kMY4DwUgsKuHqpjxgmeA9gBNA==}
+    engines: {node: '>=18'}
 
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
@@ -3132,6 +3139,8 @@ snapshots:
       js-tokens: 4.0.0
 
   lru-cache@10.4.3: {}
+
+  many-keys-map@3.0.3: {}
 
   math-intrinsics@1.1.0: {}
 

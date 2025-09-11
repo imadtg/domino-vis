@@ -1,2 +1,2 @@
-export * from './GameInitMenu';
-export { default } from './GameInitMenu';
+export * from "./GameInitMenu";
+export { default } from "./GameInitMenu";
