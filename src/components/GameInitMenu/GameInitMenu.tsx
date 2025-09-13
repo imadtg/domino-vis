@@ -71,6 +71,7 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
     event: React.FormEvent<HTMLInputElement>,
     piece: DominoPiece,
   ) {
+    flushKeyboardPiecePick();
     if (event.currentTarget.checked) {
       if (
         initialGameInfo.hands[USER].pieces.length >=
@@ -109,7 +110,9 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
     DOMElement?.focus();
   }
 
-  useKeyboardPiecePicker({ onPick: focusPiece });
+  const { flush: flushKeyboardPiecePick } = useKeyboardPiecePicker({
+    onPick: focusPiece,
+  });
 
   function withSelectRest(gameInfo: DominoIngameInfo) {
     // spreads unselected dominoes on other hands.

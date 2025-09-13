@@ -31,4 +31,11 @@ export default function useKeyboardPiecePicker({
       window.removeEventListener("keydown", handlePipKeyDown);
     };
   });
+
+  function flush() {
+    firstPip.current = undefined;
+    secondPip.current = undefined;
+  }
+
+  return { flush };
 }
