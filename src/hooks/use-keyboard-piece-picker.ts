@@ -2,11 +2,11 @@ import * as React from "react";
 import { DominoPiece } from "@/lib/features/domino/dominoUtils";
 
 interface keyboardPiecePickerParams {
-  onPieceSelect: (piece: DominoPiece) => void;
+  onPick: (piece: DominoPiece) => void;
 }
 
 export default function useKeyboardPiecePicker({
-  onPieceSelect,
+  onPick,
 }: keyboardPiecePickerParams) {
   const [firstPip, setFirstPip] = React.useState<number>();
   const [secondPip, setSecondPip] = React.useState<number>();
@@ -20,7 +20,7 @@ export default function useKeyboardPiecePicker({
         setFirstPip(nextFirstPip);
         setSecondPip(nextSecondPip);
         if (typeof secondPip !== "undefined") {
-          onPieceSelect({ left: firstPip, right: secondPip });
+          onPick({ left: firstPip, right: secondPip });
         }
       } else {
         setFirstPip(parseInt(event.key));

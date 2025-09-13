@@ -109,7 +109,7 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
     DOMElement?.focus();
   }
 
-  useKeyboardPiecePicker({ onPieceSelect: focusPiece });
+  useKeyboardPiecePicker({ onPick: focusPiece });
 
   function withSelectRest(gameInfo: DominoIngameInfo) {
     // spreads unselected dominoes on other hands.
