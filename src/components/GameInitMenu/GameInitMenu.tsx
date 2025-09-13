@@ -14,6 +14,8 @@ import {
 import DominoBlock from "../DominoBlock";
 import Button from "../Button";
 import { Gamemode } from "../DominoPlayground";
+import useKeyboardPiecePicker from "@/src/hooks/use-keyboard-piece-picker";
+import ManyKeysMap from "many-keys-map";
 
 interface GameInitMenuProps {
   gamemode: Gamemode;
@@ -69,6 +71,7 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
     event: React.FormEvent<HTMLInputElement>,
     piece: DominoPiece,
   ) {
+    flushKeyboardPiecePick();
     if (event.currentTarget.checked) {
       if (
         initialGameInfo.hands[USER].pieces.length >=
@@ -96,6 +99,19 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
       );
     }
   }
+
+  const pieceToDOMMapRef = React.useRef<
+    ManyKeysMap<[number, number], HTMLInputElement | null>
+  >(new ManyKeysMap());
+
+  function focusPiece(piece: DominoPiece) {
+    const DOMElement = pieceToDOMMapRef.current.get([piece.left, piece.right]);
+    DOMElement?.focus();
+  }
+
+  const { flush: flushKeyboardPiecePick } = useKeyboardPiecePicker({
+    onPick: focusPiece,
+  });
 
   function withSelectRest(gameInfo: DominoIngameInfo) {
     // spreads unselected dominoes on other hands.
@@ -163,6 +179,16 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
                   value={`${piece.left}-${piece.right}`}
                   checked={checked}
                   onChange={(event) => handleCheck(event, piece)}
+                  ref={(element) => {
+                    pieceToDOMMapRef.current.set(
+                      [piece.left, piece.right],
+                      element,
+                    );
+                    pieceToDOMMapRef.current.set(
+                      [piece.right, piece.left],
+                      element,
+                    );
+                  }}
                 />
               </div>
             );

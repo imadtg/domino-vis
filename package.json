@@ -14,6 +14,7 @@
     "framer-motion": "^11.3.21",
     "immer": "^10.1.1",
     "lodash": "^4.17.21",
+    "many-keys-map": "^3.0.3",
     "next": "latest",
     "posthog-js": "^1.255.1",
     "react": "^18.2.0",
@@ -51,5 +52,6 @@
     "plugins": [
       "prettier-plugin-tailwindcss"
     ]
-  }
+  },
+  "packageManager": "pnpm@10.16.0+sha512.8066e7b034217b700a9a4dbb3a005061d641ba130a89915213a10b3ca4919c19c037bec8066afdc559b89635fdb806b16ea673f2468fbb28aabfa13c53e3f769"
 }
