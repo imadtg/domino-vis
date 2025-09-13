@@ -106,7 +106,6 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
 
   function focusPiece(piece: DominoPiece) {
     const DOMElement = pieceToDOMMapRef.current.get([piece.left, piece.right]);
-    console.log(DOMElement);
     DOMElement?.focus();
   }
 
