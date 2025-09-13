@@ -8,22 +8,20 @@ interface keyboardPiecePickerParams {
 export default function useKeyboardPiecePicker({
   onPick,
 }: keyboardPiecePickerParams) {
-  const [firstPip, setFirstPip] = React.useState<number>();
-  const [secondPip, setSecondPip] = React.useState<number>();
+  const firstPip = React.useRef<number>();
+  const secondPip = React.useRef<number>();
 
   React.useEffect(() => {
     function handlePipKeyDown(event: KeyboardEvent) {
       if (!["0", "1", "2", "3", "4", "5", "6"].includes(event.key)) return;
-      if (typeof firstPip !== "undefined") {
-        const nextFirstPip = secondPip;
-        const nextSecondPip = parseInt(event.key);
-        setFirstPip(nextFirstPip);
-        setSecondPip(nextSecondPip);
-        if (typeof secondPip !== "undefined") {
-          onPick({ left: firstPip, right: secondPip });
+      if (typeof firstPip.current !== "undefined") {
+        secondPip.current = firstPip.current;
+        firstPip.current = parseInt(event.key);
+        if (typeof secondPip.current !== "undefined") {
+          onPick({ left: firstPip.current, right: secondPip.current });
         }
       } else {
-        setFirstPip(parseInt(event.key));
+        firstPip.current = parseInt(event.key);
       }
     }
 
@@ -32,5 +30,5 @@ export default function useKeyboardPiecePicker({
     return () => {
       window.removeEventListener("keydown", handlePipKeyDown);
     };
-  }, [firstPip, secondPip]); // TODO: find a way to remove these dependencies, perhaps through a ref?
+  });
 }
