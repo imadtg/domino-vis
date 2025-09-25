@@ -1,6 +1,8 @@
 {
   "private": true,
   "scripts": {
+    "predev": "make -C domino-ai && cp domino-ai/build/domino-c.wasm public/wasm/domino-c.wasm && cp domino-ai/build/domino-c.js public/wasm/domino-c.js",
+    "prebuild": "make -C domino-ai && cp domino-ai/build/domino-c.wasm public/wasm/domino-c.wasm && cp domino-ai/build/domino-c.js public/wasm/domino-c.js",
     "dev": "next",
     "build": "next build",
     "start": "next start"

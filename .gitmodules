@@ -1,0 +1,4 @@
+[submodule "domino-ai"]
+	path = domino-ai
+	url = https://github.com/imadtg/domino-ai
+	branch = emscripten-friendly

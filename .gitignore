@@ -37,3 +37,4 @@ next-env.d.ts
 
 repomix-output.xml
 .env
+public/wasm
