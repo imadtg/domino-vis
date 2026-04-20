@@ -15,7 +15,7 @@
     "immer": "^10.1.1",
     "lodash": "^4.17.21",
     "many-keys-map": "^3.0.3",
-    "next": "latest",
+    "next": "15.5.8",
     "posthog-js": "^1.255.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
