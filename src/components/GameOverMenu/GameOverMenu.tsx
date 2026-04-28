@@ -7,6 +7,7 @@ import { useAppDispatch } from "@/lib/hooks";
 
 import Button from "../Button";
 import clsx from "clsx";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface GameOverMenuProps {
   className: string;
@@ -23,14 +24,16 @@ function GameOverMenu({ className, onReset }: GameOverMenuProps) {
   }
 
   return (
-    <div className={clsx("flex flex-col", className)}>
-      <form onSubmit={submitGameReset}>
-        <fieldset className="flex flex-col gap-[8px] p-[8px]">
-          <legend>Game Over!</legend>
-          <Button>Reset</Button>
-        </fieldset>
-      </form>
-    </div>
+    <Card className={clsx("w-fit min-w-[180px]", className)}>
+      <CardHeader>
+        <CardTitle>Game Over!</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={submitGameReset}>
+          <Button type="submit">Reset</Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 export default GameOverMenu;

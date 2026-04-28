@@ -154,7 +154,7 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
           Select {initialGameInfo.hands[USER].count} domino pieces for your
           hand:
         </legend>
-        <div className="grid grid-cols-4 grid-rows-7 gap-[16px] p-[1em] landscape:grid-cols-7 landscape:grid-rows-4">
+        <div className="grid grid-cols-4 grid-rows-7 gap-[16px] p-[1em] [@media(orientation:landscape)]:grid-cols-7 [@media(orientation:landscape)]:grid-rows-4">
           {getAllDominoes().map((piece) => {
             const pieceId = `${id}-${piece.left}-${piece.right}`;
             const checked = initialGameInfo.hands[USER].pieces.some(
@@ -227,7 +227,7 @@ function GameInitMenu({ gamemode }: GameInitMenuProps) {
         />
       </fieldset>
       <div className="flex basis-[48px] justify-center px-[32px]">
-        <Button>Start game</Button>
+        <Button type="submit">Start game</Button>
       </div>
     </form>
   );

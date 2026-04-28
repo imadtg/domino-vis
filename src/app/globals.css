@@ -1,36 +1,59 @@
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 /* CSS Reset, inspired by Josh W Comeau's CSS Reset. Learn more here: https://www.joshwcomeau.com/css/custom-css-reset/ */
 /* tailwind stuff */
-@tailwind base; /* Preflight will be injected here */
+@import 'tailwindcss';
+
+@config '../../tailwind.config.mjs';
+
 /*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@layer base {
+  /* Preflight will be injected here */
+  /*
   1. Use a more-intuitive box-sizing model.
 */
-/*
+  /*
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }*/ /* included in tailwind's base */
-/*
+  /*
   2. Remove default margin
 */
-/** {
+  /** {
   margin: 0;
 }*/ /* included in tailwind base */
-/*
+  /*
   Typographic tweaks!
   3. Add accessible line-height
   4. Improve text rendering
 */
-body {
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-/*
+  body {
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  /*
   5. Improve media defaults
 */
-/*img,
+  /*img,
 picture,
 video,
 canvas,
@@ -38,38 +61,38 @@ svg {
   display: block;
   max-width: 100%;
 } */ /* included in tailwind base, maybe not fully but not worth repeating it for canvas for now */
-/*
+  /*
   6. Remove built-in form typography styles
 */
-/*input,
+  /*input,
 button,
 textarea,
 select {
   font: inherit;
 }*/ /* included in tailwind base */
-/*
+  /*
   7. Avoid text overflows
 */
-p,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  overflow-wrap: break-word;
-}
-/*
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    overflow-wrap: break-word;
+  }
+  /*
   8. Create a root stacking context
 */
-#root,
-#__next {
-  isolation: isolate;
-}
-/* End of CSS Reset */
+  #root,
+  #__next {
+    isolation: isolate;
+  }
+  /* End of CSS Reset */
 
-/* Set the default font */
-/*html,
+  /* Set the default font */
+  /*html,
 body {
   font-family:
     system-ui,
@@ -85,10 +108,8 @@ body {
     sans-serif;
 }*/ /* included in tailwind base */
 
-/* tailwind stuff that i will probably change in the future */
-@tailwind components;
-
-@tailwind utilities;
+  /* tailwind stuff that i will probably change in the future */
+}
 
 @layer base {
   .theme {
@@ -163,7 +184,7 @@ body {
     --sidebar-ring: oklch(0.556 0 0);
   }
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;

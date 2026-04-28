@@ -1,16 +1,1 @@
-import * as React from "react";
-import clsx from "clsx";
-
-function Button({
-  className = "",
-  ...delegated
-}: React.HTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      className={clsx("rounded-sm bg-gray-300 p-[4px]", className)}
-      {...delegated}
-    />
-  );
-}
-
-export default Button;
+export { Button as default, Button } from "@/components/ui/button";

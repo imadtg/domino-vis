@@ -4,6 +4,13 @@ import * as React from "react";
 import Button from "../Button";
 import clsx from "clsx";
 import { AiSearchResult, IterativeDeepeningProgressInfo } from "./aiWorker";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 interface DominoAiMenuProps {
   className?: string;
@@ -19,7 +26,6 @@ function DominoAiMenu({
   className = "",
   doIterativeDeepening,
 }: DominoAiMenuProps) {
-  // TODO: use a useReducer for these? because they are tightly coupled...
   const [iterativeDeepeningStatus, setIterativeDeepeningStatusStatus] =
     React.useState<"ongoing" | "idle" | "finished">("idle");
   const [latestSearchResult, setLatestSearchResult] =
@@ -47,9 +53,6 @@ function DominoAiMenu({
           setLatestDepth(progressInfo.depth);
           break;
         case "interrupted":
-          // this is unreachable with how we are reporting progress right now
-          // and we shouldnt need it because we only interrupt the search as we pass the turn
-          // thus hiding this menu
           setIterativeDeepeningStatusStatus("idle");
           setLatestSearchResult(undefined);
           setLatestDepth(undefined);
@@ -62,31 +65,38 @@ function DominoAiMenu({
   }
 
   return (
-    <div className={clsx("flex flex-col", className)}>
-      <form onSubmit={submitMoveSearch}>
-        <fieldset className="flex flex-col gap-[8px] p-[8px]">
-          <legend>Domino AI</legend>
-          <Button className="whitespace-nowrap">Find best move!</Button>
-        </fieldset>
-      </form>
-      {iterativeDeepeningStatus === "ongoing" ? (
-        <p className="whitespace-nowrap">Searching...</p>
-      ) : iterativeDeepeningStatus === "finished" ? (
-        <p className="whitespace-nowrap">Search finished!</p>
-      ) : null}
-      {typeof latestSearchResult !== "undefined" &&
-      latestSearchResult.status === "success" ? (
-        <>
-          <p className="whitespace-nowrap">Depth = {latestDepth}</p>
-          <p className="whitespace-nowrap">
-            Score = {latestSearchResult.score}
-          </p>
-          <p className="whitespace-nowrap">
-            Explored nodes = {latestSearchResult.numberOfExploredNodes}
-          </p>
-        </>
-      ) : null}
-    </div>
+    <Card className={clsx("w-fit min-w-[220px]", className)}>
+      <CardHeader>
+        <CardTitle>Domino AI</CardTitle>
+        <CardDescription>
+          Run a search and inspect the latest result.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-[8px]">
+        <form onSubmit={submitMoveSearch}>
+          <Button className="whitespace-nowrap" type="submit">
+            Find best move!
+          </Button>
+        </form>
+        {iterativeDeepeningStatus === "ongoing" ? (
+          <p className="whitespace-nowrap">Searching...</p>
+        ) : iterativeDeepeningStatus === "finished" ? (
+          <p className="whitespace-nowrap">Search finished!</p>
+        ) : null}
+        {typeof latestSearchResult !== "undefined" &&
+        latestSearchResult.status === "success" ? (
+          <>
+            <p className="whitespace-nowrap">Depth = {latestDepth}</p>
+            <p className="whitespace-nowrap">
+              Score = {latestSearchResult.score}
+            </p>
+            <p className="whitespace-nowrap">
+              Explored nodes = {latestSearchResult.numberOfExploredNodes}
+            </p>
+          </>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 export default DominoAiMenu;

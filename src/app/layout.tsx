@@ -3,12 +3,6 @@ import { StoreProvider } from "./StoreProvider";
 import "./globals.css";
 import * as React from "react";
 import { MotionProvider } from "./MotionProvider";
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
-
-
 interface Props {
   readonly children: ReactNode;
 }
@@ -16,7 +10,7 @@ interface Props {
 export default function RootLayout({ children }: Props) {
   return (
     <StoreProvider>
-      <html lang="en" className={cn("font-sans", geist.variable)}>
+      <html lang="en" className="font-sans">
         <body>
           {/* commented out because it causes hydration issues with instrumentation-client.ts, and it didnt even work in the first place...
             <Script

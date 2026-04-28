@@ -7,6 +7,8 @@ import {
   turnAround,
 } from "@/lib/features/domino/dominoUtils";
 import Button from "@/src/components/Button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function PiecePlaygroundPage() {
   const [pieces, setPieces] = React.useState<DominoPiece[]>([]);
@@ -30,8 +32,8 @@ function PiecePlaygroundPage() {
       >
         <fieldset className="flex gap-[8px] p-[8px]">
           <legend>Enter Piece</legend>
-          <label htmlFor="left">Left pip:</label>
-          <input
+          <Label htmlFor="left">Left pip:</Label>
+          <Input
             type="number"
             min={0}
             max={6}
@@ -40,8 +42,8 @@ function PiecePlaygroundPage() {
             placeholder="0"
             onChange={(event) => setLeft(event.target.value)}
           />
-          <label htmlFor="right">Right pip:</label>
-          <input
+          <Label htmlFor="right">Right pip:</Label>
+          <Input
             type="number"
             min={0}
             max={6}
@@ -51,7 +53,7 @@ function PiecePlaygroundPage() {
             onChange={(event) => setRight(event.target.value)}
           />
         </fieldset>
-        <Button>Submit</Button>
+        <Button type="submit">Submit</Button>
       </form>
       <div className="relative flex items-center gap-[8px]">
         {pendingPiece && (

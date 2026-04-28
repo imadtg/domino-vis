@@ -158,7 +158,7 @@ function DominoSvg({ topNumber, bottomNumber }: DominoSvgProps) {
         width="100"
         height="200"
         rx="20"
-        className="fill-[--applied-domino-body-color]"
+        fill="var(--applied-domino-body-color)"
       />
       {(() => {
         // TODO: refactor this logic into CSS variables.

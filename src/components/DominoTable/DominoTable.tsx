@@ -26,6 +26,8 @@ import {
   Side,
   DominoIngameInfo,
 } from "@/lib/features/domino/dominoUtils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface DominoTableProps {
   bestMove?: Move;
@@ -130,7 +132,7 @@ function InnerDominoTable({ bestMove, gameInfo }: InnerDominoTableProps) {
   }, [dispatch, setChosenPiece]);
 
   return (
-    <div className="relative place-self-stretch flex h-full flex-col items-center">
+    <div className="relative flex h-full flex-col items-center place-self-stretch">
       <Hand
         hand={hands[OPPONENT]}
         onPieceClick={(piece) =>
@@ -269,11 +271,11 @@ function ImperfectPicker({ onImperfectPick }: ImperfectPickerProps) {
           Unrevealed dominoes picker from the Boneyard
           {/* TODO: have a better explanation of what this is... */}
         </legend>
-        <label htmlFor={`${id}-imperfect-pick`}>
+        <Label htmlFor={`${id}-imperfect-pick`}>
           Amount of unrevealed dominoes picked from the boneyard (does not
           include the last one that is to be played)
-        </label>
-        <input
+        </Label>
+        <Input
           id={`${id}-imperfect-pick`}
           type="number"
           value={imperfectPickAmount}
@@ -282,7 +284,7 @@ function ImperfectPicker({ onImperfectPick }: ImperfectPickerProps) {
           min="0"
           placeholder="0"
         />
-        <Button>Pick from the boneyard</Button>
+        <Button type="submit">Pick from the boneyard</Button>
       </fieldset>
     </form>
   );

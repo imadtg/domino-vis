@@ -8,6 +8,8 @@ import {
 } from "@/lib/features/domino/dominoUtils";
 import Button from "@/src/components/Button";
 import Snake from "@/src/components/Snake";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function SnakePlaygroundPage() {
   const [pieces, setPieces] = React.useState<DominoPiece[]>([]);
@@ -63,8 +65,8 @@ function SnakePlaygroundPage() {
       >
         <fieldset className="flex gap-[8px] p-[8px]">
           <legend>Enter Piece</legend>
-          <label htmlFor="left">Left pip:</label>
-          <input
+          <Label htmlFor="left">Left pip:</Label>
+          <Input
             type="number"
             min={0}
             max={6}
@@ -73,8 +75,8 @@ function SnakePlaygroundPage() {
             placeholder="0"
             onChange={(event) => setLeft(event.target.value)}
           />
-          <label htmlFor="right">Right pip:</label>
-          <input
+          <Label htmlFor="right">Right pip:</Label>
+          <Input
             type="number"
             min={0}
             max={6}
@@ -84,7 +86,7 @@ function SnakePlaygroundPage() {
             onChange={(event) => setRight(event.target.value)}
           />
         </fieldset>
-        <Button>Submit</Button>
+        <Button type="submit">Submit</Button>
       </form>
       <Button
         className="fixed bottom-0 left-0 top-0 my-auto h-fit"
