@@ -149,7 +149,11 @@ export default function DominoPlayground() {
               onReset={() => setGamemode(undefined)}
             />
           ) : (
-            <Draggable nodeRef={nodeRef}>
+            <Draggable
+              // this is so that tapping the AI search button on mobile doesn't get consumed by react-draggable's touch handling
+              cancel="button"
+              nodeRef={nodeRef}
+            >
               <div
                 className="fixed bottom-0 right-[48px] top-0 my-auto h-1/2"
                 ref={nodeRef}
