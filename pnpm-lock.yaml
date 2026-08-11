@@ -21,8 +21,8 @@ importers:
         specifier: ^1.4.2
         version: 1.4.2
       domino-ai:
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.1.1
+        version: 0.1.1
       framer-motion:
         specifier: ^11.3.21
         version: 11.18.2(@emotion/is-prop-valid@1.2.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -785,8 +785,8 @@ packages:
     resolution: {integrity: sha512-35mSku4ZXK0vfCuHEDAwt55dg2jNajHZ1odvF+8SSr82EsZY4QmXfuWso8oEd8zRhVObSN18aM0CjSdoBX7zIw==}
     engines: {node: '>=0.10.0'}
 
-  domino-ai@0.1.0:
-    resolution: {integrity: sha512-EGuguPtlfx4VMfma/UUgpKhz7uENOyyXQzrPam4rfGSn5qy/Ogy7IMmt8ciByXGMeYuhSPWJ3EyRjCVHOHkPuQ==}
+  domino-ai@0.1.1:
+    resolution: {integrity: sha512-sg16FHvC22sT/+croZ74iWjkBckZV3SPVHNfGLl3edFrFXvMeVSywDuVdNxadi7VnvmwruU0stxDdwk8ypthXA==}
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -2570,7 +2570,7 @@ snapshots:
     dependencies:
       esutils: 2.0.3
 
-  domino-ai@0.1.0:
+  domino-ai@0.1.1:
     dependencies:
       '@types/emscripten': 1.40.1
 
