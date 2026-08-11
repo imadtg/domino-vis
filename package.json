@@ -6,8 +6,8 @@
     "start": "next start"
   },
   "dependencies": {
+    "domino-ai": "^0.1.0",
     "@reduxjs/toolkit": "^2.2.0",
-    "@types/emscripten": "^1.40.1",
     "clsx": "^2.1.1",
     "comlink": "^4.4.2",
     "detect-element-overflow": "^1.4.2",

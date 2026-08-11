@@ -13,8 +13,8 @@ import {
   newMovesContext,
   extractType,
 } from "@/src/components/DominoAiMenu/cToJShelpers";
+import { DominoAiModule } from "domino-ai";
 import { USER } from "../GameInitMenu";
-import { DominoAiModule } from "@/src/components/DominoAiMenu/domino-c";
 
 let Module: DominoAiModule;
 let fallbackPtr: number;
