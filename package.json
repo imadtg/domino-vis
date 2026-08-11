@@ -7,10 +7,10 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.2.0",
-    "@types/emscripten": "^1.40.1",
     "clsx": "^2.1.1",
     "comlink": "^4.4.2",
     "detect-element-overflow": "^1.4.2",
+    "domino-ai": "^0.1.1",
     "framer-motion": "^11.3.21",
     "immer": "^10.1.1",
     "lodash": "^4.17.21",

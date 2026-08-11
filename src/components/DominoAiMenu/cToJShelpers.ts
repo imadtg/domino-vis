@@ -1,9 +1,6 @@
-import createModule from "@/public/wasm/domino-c";
-import type { DominoAiModule } from "./domino-c";
+import createModule from "domino-ai";
+import type { DominoAiModule } from "domino-ai";
 const ModuleConfig = {
-  locateFile: function (file: string) {
-    return `/wasm/${file}`;
-  },
   print: (...args: string[]) => {
     const text = args.join(" ");
     console.log(text);
