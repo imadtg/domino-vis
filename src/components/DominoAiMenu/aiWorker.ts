@@ -13,7 +13,7 @@ import {
   newMovesContext,
   extractType,
 } from "@/src/components/DominoAiMenu/cToJShelpers";
-import { DominoAiModule } from "domino-ai";
+import type { DominoAiModule } from "domino-ai";
 import { USER } from "../GameInitMenu";
 
 let Module: DominoAiModule;
